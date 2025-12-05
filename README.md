@@ -14,7 +14,7 @@ Through its unique **context-aware enhancement mechanism**, TeleMem provides con
 
 Building upon this foundation, TeleMem implements **video understanding, multimodal reasoning, and visual question answering** capabilities. Through a complete pipeline of video frame extraction, caption generation, and vector database construction, AI Agents can effortlessly **store, retrieve, and reason over video content** just like handling text memories.
 
-📘 Overlay Mode Development Documentation: [TeleMem-Overlay.md](https://github.com/TeleAI-UAGI/telemem/blob/telemem-dev/TeleMem-Overlay.md)
+📘 Overlay Mode Development Documentation: [TeleMem-Overlay.md](TeleMem-Overlay.md)
 
 <div align="left">
 
@@ -541,7 +541,7 @@ video/
 
 ## Development and Contribution
 
-* Patch management process: Refer to [TeleMem-Overlay.md](https://github.com/TeleAI-UAGI/telemem/blob/telemem-dev/TeleMem-Overlay.md)
+* Patch management process: Refer to [TeleMem-Overlay.md](TeleMem-Overlay.md)
 * Chinese documentation: [README-ZH.md](README-ZH.md)
 
 ---
