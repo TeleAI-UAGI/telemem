@@ -1,0 +1,45 @@
+# ========== System Files ==========
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========== Editors ==========
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ========== Python ==========
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+
+# ========== Conda ==========
+conda-env/
+*.conda
+
+# ========== Node ==========
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ========== Build Outputs ==========
+build/
+dist/
+out/
+
+# ========== Logs ==========
+*.log
+
+# ========== Temporary Files ==========
+tmp/
+temp/
+.cache
+
+# ========== Jupyter ==========
+.ipynb_checkpoints/

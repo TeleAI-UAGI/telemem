@@ -545,7 +545,9 @@ video/
 * Chinese documentation: [README-ZH.md](README-ZH.md)
 
 ---
-
+## License
+[Apache 2.0 License](LICENSE)
+---
 ## Acknowledgements
 
 TeleMem’s development has been deeply inspired by open-source communities and cutting-edge research. We extend our sincere gratitude to the following projects and teams:
