@@ -526,14 +526,17 @@ video/
 ```
 
 ------
-
 ## 开发与贡献
 
 * 补丁管理流程：参考 [TeleMem-Overlay.md](https://github.com/TeleAI-UAGI/telemem/blob/telemem-dev/TeleMem-Overlay.md)
 * 英文文档：[README.md](README.md)
 
 ---
+## 许可证
 
+[Apache 2.0 License](LICENSE)
+
+---
 ## 致谢
 
 TeleMem 的研发与迭代离不开开源社区的宝贵成果与前沿研究的启发，在此向以下项目 / 研究团队致以诚挚的感谢：
@@ -542,10 +545,7 @@ TeleMem 的研发与迭代离不开开源社区的宝贵成果与前沿研究的
 - [**Memobase**](https://github.com/memodb-io/memobase)
 - [**MOOM**](https://github.com/cows21/MOOM-Roleplay-Dialogue)
 - [**DVD**](https://github.com/microsoft/DeepVideoDiscovery)
-
-## 许可证
-
-[Apache 2.0 License](LICENSE)
+- [**Memento**](https://github.com/Agent-on-the-Fly/Memento)
 
 ---
 
