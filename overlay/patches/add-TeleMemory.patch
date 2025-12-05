@@ -1,9 +1,9 @@
 diff --git a/vendor/TeleMem/TeleMemory.py b/vendor/TeleMem/TeleMemory.py
 new file mode 100644
-index 0000000..a0eb9bb
+index 0000000..b166fe0
 --- /dev/null
 +++ b/vendor/TeleMem/TeleMemory.py
-@@ -0,0 +1,834 @@
+@@ -0,0 +1,835 @@
 +from mem0 import Memory
 +from vendor.TeleMem.utils import (
 +    load_config,
@@ -62,6 +62,7 @@ index 0000000..a0eb9bb
 +        self.llm_model = config["llm_model"]
 +        self.emb_client = OpenAI(base_url=config["emb_client"], api_key=config["emb_api_key"])
 +        self.emb_model = config["emb_model"]
++        self.emb_dim = config["emb_dim"]
 +
 +        self.events_buffer = {}
 +        self.buffer_locks = {}
@@ -793,8 +794,8 @@ index 0000000..a0eb9bb
 +        else:
 +            logger.info(f"[add_mm] Building VDB -> {vdb_json_path}")
 +            os.makedirs(video_vdb_dir, exist_ok=True)
-+            import config as _cfg
-+            dim = emb_dim if emb_dim is not None else _cfg.LOCAL_EMBEDDING_LARGE_DIM
++            # import config as _cfg
++            dim = emb_dim if emb_dim is not None else self.emb_dim
 +
 +            init_single_video_db(
 +                video_caption_json_path=caption_json_path,
