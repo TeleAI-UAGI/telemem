@@ -543,6 +543,9 @@ TeleMem 的研发与迭代离不开开源社区的宝贵成果与前沿研究的
 - [**MOOM**](https://github.com/cows21/MOOM-Roleplay-Dialogue)
 - [**DVD**](https://github.com/microsoft/DeepVideoDiscovery)
 
+## 许可证
+
+[Apache 2.0 License](LICENSE)
 
 ---
 
