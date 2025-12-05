@@ -14,7 +14,7 @@ TeleMem是一个*完全兼容Mem0* 的高级记忆管理系统，专为 **多轮
 
 在此基础上，实现了**视频理解、多模态推理与视觉问答** 能力，通过视频帧提取、字幕生成、向量数据库构建的完整流水线，使 AI Agent 能够像处理文本记忆一样，轻松**存储、检索和推理视频内容**。
 
-📘 Overlay 模式开发说明：[TeleMem-Overlay.md](https://github.com/TeleAI-UAGI/telemem/blob/telemem-dev/TeleMem-Overlay.md)
+📘 Overlay 模式开发说明：[TeleMem-Overlay.md](TeleMem-Overlay.md)
 
 <div align="left">
 
@@ -528,7 +528,7 @@ video/
 ------
 ## 开发与贡献
 
-* 补丁管理流程：参考 [TeleMem-Overlay.md](https://github.com/TeleAI-UAGI/telemem/blob/telemem-dev/TeleMem-Overlay.md)
+* 补丁管理流程：参考 [TeleMem-Overlay.md](TeleMem-Overlay.md)
 * 英文文档：[README.md](README.md)
 
 ---
