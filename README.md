@@ -558,7 +558,8 @@ TeleMem’s development has been deeply inspired by open-source communities and 
 - [**Memobase**](https://github.com/memodb-io/memobase)
 - [**MOOM**](https://github.com/cows21/MOOM-Roleplay-Dialogue)
 - [**DVD**](https://github.com/microsoft/DeepVideoDiscovery)
-
+- [**Memento**](https://github.com/Agent-on-the-Fly/Memento)
+  
 ------
 
 <div align="center">
