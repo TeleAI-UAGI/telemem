@@ -1,0 +1,3412 @@
+diff --git a/vendor/TeleMem/TeleMemory.py b/vendor/TeleMem/TeleMemory.py
+new file mode 100644
+index 0000000..a0eb9bb
+--- /dev/null
++++ b/vendor/TeleMem/TeleMemory.py
+@@ -0,0 +1,834 @@
++from mem0 import Memory
++from vendor.TeleMem.utils import (
++    load_config,
++    parse_messages,
++    get_recent_messages_prompt,
++    get_person_prompt,
++    extract_events_from_text,
++    merge_consecutive_messages,
++    _cosine_similarity
++)
++from typing import Any, Dict, List, Optional
++from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
++import asyncio
++import yaml
++from tqdm import tqdm
++import threading
++import concurrent
++import concurrent.futures
++import json
++import logging
++import os
++import warnings
++import numpy as np
++import re
++from copy import deepcopy
++from datetime import datetime
++from typing import Any, Dict, Optional
++import queue
++import faiss
++import pytz
++from pydantic import ValidationError
++from openai import OpenAI
++import openai
++from pathlib import Path
++
++import os
++import sys
++BASE_DIR = os.path.dirname(os.path.abspath(__file__))
++sys.path.insert(0, os.path.join(BASE_DIR, 'mm_utils'))
++from core import MMCoreAgent
++from frame_caption import process_video
++from build_database import init_single_video_db
++from video_utils import decode_video_to_frames
++
++logger = logging.getLogger(__name__)
++
++class TeleMemory(Memory):
++    def __init__(self, *args, config_path="vendor/TeleMem/config.yaml", **kwargs):
++        super().__init__(*args, **kwargs)
++        config = load_config(config_path)
++
++        self.buffer_size = config["buffer_size"]
++        self.similarity_threshold = config["similarity_threshold"]
++        self.faiss_dir = Path(config["faiss_dir"])
++        self.llm_client = OpenAI(base_url=config["llm_client"], api_key=config["llm_api_key"])
++        self.llm_model = config["llm_model"]
++        self.emb_client = OpenAI(base_url=config["emb_client"], api_key=config["emb_api_key"])
++        self.emb_model = config["emb_model"]
++
++        self.events_buffer = {}
++        self.buffer_locks = {}
++        self.flush_locks = {}
++        self.file_locks = {}
++        self.faiss_store = {}
++        self.metadata_store = {}
++        self.faiss_dir.mkdir(parents=True, exist_ok=True)
++
++    def _get_faiss_index_path(self, sample_id, key):
++        return self.faiss_dir / f"{sample_id}_{key}.index"
++
++    def _get_metadata_path(self, sample_id, key):
++        return self.faiss_dir / f"{sample_id}_{key}_meta.json"
++
++    def _load_or_create_index(self, sample_id, key, dim=1024):
++        index_path = self._get_faiss_index_path(sample_id, key)
++        meta_path = self._get_metadata_path(sample_id, key)
++
++        if index_path.exists() and meta_path.exists():
++            index = faiss.read_index(str(index_path))
++            with open(meta_path, 'r', encoding='utf-8') as f:
++                metadata = json.load(f)
++        else:
++            index = faiss.IndexFlatIP(dim)
++            metadata = []
++
++        if sample_id not in self.faiss_store:
++            self.faiss_store[sample_id] = {}
++            self.metadata_store[sample_id] = {}
++        self.faiss_store[sample_id][key] = index
++        self.metadata_store[sample_id][key] = metadata
++
++    def _save_faiss_index(self, sample_id, key):
++        index = self.faiss_store[sample_id][key]
++        metadata = self.metadata_store[sample_id][key]
++
++        index_path = self._get_faiss_index_path(sample_id, key)
++        meta_path = self._get_metadata_path(sample_id, key)
++
++        faiss.write_index(index, str(index_path))
++        with open(meta_path, 'w', encoding='utf-8') as f:
++            json.dump(metadata, f, ensure_ascii=False, indent=4)
++
++    def _get_buffer_lock(self, sample_id):
++        """获取或创建指定 sample_id 的 buffer 锁"""
++        if sample_id not in self.buffer_locks:
++            self.buffer_locks[sample_id] = threading.Lock()
++        return self.buffer_locks[sample_id]
++
++    def _get_flush_lock(self, sample_id):
++        """获取或创建指定 sample_id 的 flush 锁"""
++        if sample_id not in self.flush_locks:
++            self.flush_locks[sample_id] = threading.Lock()
++        return self.flush_locks[sample_id]
++
++    def _get_file_lock(self, sample_id):
++        """获取或创建指定 sample_id 的文件访问锁 (用于磁盘文件级别的读写互斥)"""
++        if sample_id not in self.file_locks:
++            self.file_locks[sample_id] = threading.Lock()
++        return self.file_locks[sample_id]
++
++    def _find_similar_memories(self, embedding, sample_id, threshold=0.95, top_k=10):
++        """
++        从 FAISS 向量库中查找相似的记忆。
++        """
++        similar_memories = []
++
++        self._load_or_create_index(sample_id, "events", dim=len(embedding))
++
++        index = self.faiss_store[sample_id]["events"]
++        metadata = self.metadata_store[sample_id]["events"]
++
++        if index.ntotal == 0:
++            return similar_memories
++
++        query_emb = np.array(embedding, dtype=np.float32)
++        query_emb = query_emb / np.linalg.norm(query_emb)
++        query_emb = query_emb.reshape(1, -1)
++
++        D, I = index.search(query_emb, top_k)
++        seen_summaries = set()
++        unique_similar_memories = []
++
++        for score, idx in zip(D[0], I[0]):
++            if idx == -1:
++                continue
++            if score < threshold:
++                break
++            mem = metadata[idx]
++            summary = mem.get("summary", "").strip()
++            if summary and summary in seen_summaries:
++                continue
++            seen_summaries.add(summary)
++            try:
++                emb_vector = index.reconstruct(int(idx))
++                emb_list = emb_vector.tolist()
++            except Exception as e:
++                logger.warning(f"Failed to reconstruct embedding for idx {idx}: {e}")
++                emb_list = mem.get("embedding")
++
++            full_mem = {
++                "summary": mem.get("summary"),
++                "embedding": emb_list,
++                "sample_id": mem.get("sample_id"),
++                "round_index": mem.get("round_index"),
++                "timestamp": mem.get("timestamp"),
++                "original_messages": mem.get("original_messages"),
++            }
++
++            unique_similar_memories.append(full_mem)
++
++        return unique_similar_memories
++
++    def _cluster_memories(self, memories, threshold=0.95):
++        """对记忆进行聚类"""
++        if not memories:
++            return []
++
++        clusters = []
++        embeddings = [np.array(m.get("embedding"), dtype=np.float32).reshape(-1) for m in memories if m.get("embedding")]
++
++        for i, memory in enumerate(memories):
++            if not memory.get("embedding"):
++                continue
++            current_embedding = embeddings[i]
++            assigned = False
++
++            for cluster in clusters:
++                cluster_embeddings = [np.array(m.get("embedding"), dtype=np.float32).reshape(-1) for m in cluster if m.get("embedding")]
++                similarities = [_cosine_similarity(current_embedding, emb) for emb in cluster_embeddings]
++
++                if any(sim >= threshold for sim in similarities):
++                    cluster.append(memory)
++                    assigned = True
++                    break
++
++            if not assigned:
++                clusters.append([memory])
++
++        return clusters
++
++
++    def _process_cluster(self, cluster):
++        """处理单个聚类"""
++        if len(cluster) == 1:
++            return [cluster[0]]
++        else:
++            last_item = cluster[-1]
++            other_items = cluster[:-1]
++
++            other_summaries = [item["summary"] for item in other_items]
++            last_summary = last_item["summary"]
++
++            system_prompt = "你是一个专业的记忆整理助手，负责对相似的记忆进行增删改操作。"
++            user_prompt = f'''
++你将收到一组相似的记忆片段，请根据以下规则进行处理：
++- 如果记忆内容重复或相似，进行合并
++- 如果新记忆包含了旧记忆的补充信息，请合并
++- 如果记忆内容冲突，请保留最新或更准确的信息
++- 如果记忆内容可以独立存在，请保留
++- 如果没有新记忆产生，请输出相似记忆片段和新记忆片段
++
++请输出处理后的记忆列表，格式为JSON：
++{{
++  "updated_memories": [
++    {{"summary": "处理后的记忆摘要1"}},
++    {{"summary": "处理后的记忆摘要2"}}
++  ]
++}}
++
++相似记忆片段：
++{other_summaries}
++
++新记忆片段：
++{last_summary}
++'''.strip()
++
++            try:
++                response = self.llm_client.chat.completions.create(
++                    model=self.llm_model,
++                    messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
++                    response_format={"type": "json_object"},
++                    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
++                    timeout=30
++                ).choices[0].message.content
++
++
++                try:
++                    result = json.loads(response)
++                    updated_summaries = [item["summary"] for item in result.get("updated_memories", [])]
++
++                    updated_items = []
++                    for summary in updated_summaries:
++                        embedding_response = self.emb_client.embeddings.create(
++                            model=self.emb_model,
++                            input=summary
++                        )
++                        messages_embeddings = embedding_response.data[0].embedding
++                        updated_item = {
++                            "summary": summary,
++                            "embedding": messages_embeddings,
++                            "sample_id": last_item.get("sample_id"),
++                            "original_messages": last_item.get("original_messages"),
++                            "round_index": last_item.get("round_index"),
++                            "timestamp": datetime.now(pytz.UTC).isoformat()
++                        }
++                        updated_items.append(updated_item)
++
++                    return updated_items
++                except Exception as e:
++                    logger.error(f"Failed to parse LLM response: {e}")
++                    return cluster
++            except Exception as e:
++                logger.error(f"Failed to process cluster with LLM: {e}")
++                return cluster
++
++    def _flush_buffer(self, sample_id):
++        """清空指定 sample_id 的 buffer 并处理其中的数据"""
++        if sample_id not in self.events_buffer or not self.events_buffer[sample_id]:
++            return
++
++        # 1. 收集 buffer 中的新记忆和相似记忆
++        new_mem_only = [item["new_memory"] for item in self.events_buffer[sample_id]]
++        all_similar_memories = []
++        for buffer_item in self.events_buffer[sample_id]:
++            all_similar_memories.extend(buffer_item.get("similar_memory", []))
++
++        combined_memories = all_similar_memories + new_mem_only
++
++        deduplicated_memories = []
++        for mem in combined_memories:
++            if mem not in deduplicated_memories:
++                deduplicated_memories.append(mem)
++
++        combined_memories = deduplicated_memories
++
++        if not combined_memories:
++            del self.events_buffer[sample_id]
++            return
++        # 2. 聚类
++        clusters = self._cluster_memories(combined_memories, self.similarity_threshold)
++
++        # 3. 处理每个聚类（调用 LLM 生成更新后的摘要）
++        processed_memories = []
++        for cluster in clusters:
++            processed_cluster = self._process_cluster(cluster)
++            processed_memories.extend(processed_cluster)
++
++        if not processed_memories:
++            del self.events_buffer[sample_id]
++            return
++
++        # 4. 写入 FAISS（按 sample_id + "events" 分区）
++        dim = len(processed_memories[0]["embedding"])
++        self._load_or_create_index(sample_id, "events", dim=dim)
++
++        index = self.faiss_store[sample_id]["events"]
++        meta_list = self.metadata_store[sample_id]["events"]
++
++        # 获取文件锁（用于磁盘写入互斥）
++        file_lock = self._get_file_lock(sample_id)
++        with file_lock:
++            # 添加到 FAISS 索引 & metadata list
++            for mem in processed_memories:
++                emb = np.array(mem["embedding"], dtype=np.float32)
++                emb = emb / np.linalg.norm(emb)  # 归一化（FAISS IndexFlatIP 要求）
++                index.add(emb.reshape(1, -1))
++                meta_list.append({
++                    "summary": mem["summary"],
++                    "sample_id": mem["sample_id"],
++                    "round_index": mem.get("round_index"),
++                    "timestamp": mem["timestamp"],
++                    "original_messages": mem.get("original_messages")
++                })
++
++            # 持久化到磁盘
++            self._save_faiss_index(sample_id, "events")
++
++        logger.info(f"Flushed {len(processed_memories)} memories to FAISS for sample_id: {sample_id}")
++        # 清空该 sample_id 的 buffer
++        del self.events_buffer[sample_id]
++
++    def _process_single_round(self, idx, msgs, all_rounds, user_list, sample_id):
++        """处理单个对话轮次"""
++        parsed_messages = parse_messages(msgs)
++        event_chunk_size = 3
++        person_chunk_size = 3
++        context_start_idx = max(0, idx - event_chunk_size)
++        person_context_start_idx = max(0, idx - person_chunk_size)
++        context_messages = all_rounds[context_start_idx:idx]
++        context_messages_person = all_rounds[person_context_start_idx:idx]
++
++        context_messages_str = "".join(parse_messages(round_message) for round_message in context_messages)
++        context_messages_person_str = "".join(parse_messages(round_message) for round_message in context_messages_person)
++
++        system_prompt, user_prompt = get_recent_messages_prompt(parsed_messages, context_messages_str)
++        system_prompt_u1, user_prompt_u1 = get_person_prompt(parsed_messages, context_messages_person_str, user_list[0])
++        system_prompt_u2, user_prompt_u2 = get_person_prompt(parsed_messages, context_messages_person_str, user_list[1])
++
++        @retry(
++            stop=stop_after_attempt(3),
++            wait=wait_exponential(multiplier=1, min=4, max=10),
++            retry=retry_if_exception_type((openai.APIError, openai.APIConnectionError, openai.RateLimitError, openai.Timeout, TimeoutError)),
++            reraise=True
++        )
++        def call_llm_with_retry(s_prompt, u_prompt):
++            """带重试机制的LLM调用"""
++            return self.llm_client.chat.completions.create(
++                model=self.llm_model,
++                messages=[{"role": "system", "content": s_prompt}, {"role": "user", "content": u_prompt}],
++                # response_format={"type": "json_object"},
++                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
++                timeout=30
++            ).choices[0].message.content
++
++        try:
++            response = call_llm_with_retry(system_prompt, user_prompt)
++            response_u1 = call_llm_with_retry(system_prompt_u1, user_prompt_u1)
++            response_u2 = call_llm_with_retry(system_prompt_u2, user_prompt_u2)
++        except Exception as e:
++            logger.error(f"Failed to generate summary for round {idx}: {str(e)}")
++            return None, None, None
++
++        try:
++            new_retrieved_facts = extract_events_from_text(response or "")
++        except Exception as e:
++            logger.error(f"Error in new_retrieved_facts for round {idx}: {e}")
++            new_retrieved_facts = []
++        try:
++            new_user1_facts = extract_events_from_text(response_u1 or "")
++        except Exception as e:
++            logger.error(f"Error in new_user1_facts for round {idx}: {e}")
++            new_user1_facts = []
++        try:
++            new_user2_facts = extract_events_from_text(response_u2 or "")
++        except Exception as e:
++            logger.error(f"Error in new_user2_facts for round {idx}: {e}")
++            new_user2_facts = []
++
++
++        new_buffer_memories = []
++        for new_mem in new_retrieved_facts:
++            embedding_response = self.emb_client.embeddings.create(
++                model = self.emb_model,
++                input = new_mem
++            )
++            messages_embeddings = embedding_response.data[0].embedding
++            memory_data = {
++                "summary": new_mem,
++                "embedding": messages_embeddings ,
++                "sample_id": sample_id,
++                "original_messages": msgs,
++                "round_index": idx,
++                "timestamp": datetime.now(pytz.UTC).isoformat()
++            }
++
++            similar_memories = self._find_similar_memories(
++                messages_embeddings, sample_id, self.similarity_threshold
++            )
++
++            new_buffer_memories.append({
++                "new_memory": memory_data,
++                "similar_memory": similar_memories
++            })
++
++        all_person_memory_1 = []
++        all_person_memory_2 = []
++        for new_mem_u1 in new_user1_facts:
++            embedding_response = self.emb_client.embeddings.create(
++                model = self.emb_model,
++                input = new_mem_u1
++            )
++            messages_embeddings = embedding_response.data[0].embedding
++            memory_data = {
++                "summary": new_mem_u1,
++                "user": user_list[0],
++                "embedding": messages_embeddings ,
++                "sample_id": sample_id,
++                "original_messages": msgs,
++                "round_index": idx,
++                "timestamp": datetime.now(pytz.UTC).isoformat()
++            }
++            all_person_memory_1.append(memory_data)
++
++        for new_mem_u2 in new_user2_facts:
++            embedding_response = self.emb_client.embeddings.create(
++                model = self.emb_model,
++                input = new_mem_u2
++            )
++            messages_embeddings = embedding_response.data[0].embedding
++            memory_data = {
++                "summary": new_mem_u2,
++                "user": user_list[1],
++                "embedding": messages_embeddings ,
++                "sample_id": sample_id,
++                "original_messages": msgs,
++                "round_index": idx,
++                "timestamp": datetime.now(pytz.UTC).isoformat()
++            }
++            all_person_memory_2.append(memory_data)
++
++        return new_buffer_memories, all_person_memory_1, all_person_memory_2
++
++
++
++    def add(
++        self,
++        messages,
++        *,
++        user_id: Optional[str] = None,
++        agent_id: Optional[str] = None,
++        run_id: Optional[str] = None,
++        metadata: Optional[Dict[str, Any]] = None,
++        infer: bool = True,
++        memory_type: Optional[str] = None,
++        prompt: Optional[str] = None,
++    ):
++        """
++        Create a new memory.
++
++        Adds new memories scoped to a single session id (e.g. `user_id`, `agent_id`, or `run_id`). One of those ids is required.
++
++        Args:
++            messages (str or List[Dict[str, str]]): The message content or list of messages
++                (e.g., `[{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi"}]`)
++                to be processed and stored.
++            user_id (str, optional): ID of the user creating the memory. Defaults to None.
++            agent_id (str, optional): ID of the agent creating the memory. Defaults to None.
++            run_id (str, optional): ID of the run creating the memory. Defaults to None.
++            metadata (dict, optional): Metadata to store with the memory. Defaults to None.
++            infer (bool, optional): If True (default), an LLM is used to extract key facts from
++                'messages' and decide whether to add, update, or delete related memories.
++                If False, 'messages' are added as raw memories directly.
++            memory_type (str, optional): Specifies the type of memory. Currently, only
++                `MemoryType.PROCEDURAL.value` ("procedural_memory") is explicitly handled for
++                creating procedural memories (typically requires 'agent_id'). Otherwise, memories
++                are treated as general conversational/factual memories.memory_type (str, optional): Type of memory to create. Defaults to None. By default, it creates the short term memories and long term (semantic and episodic) memories. Pass "procedural_memory" to create procedural memories.
++            prompt (str, optional): Prompt to use for the memory creation. Defaults to None.
++
++
++        Returns:
++            dict: A dictionary containing the result of the memory addition operation, typically
++                  including a list of memory items affected (added, updated) under a "results" key,
++                  and potentially "relations" if graph store is enabled.
++                  Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "event": "ADD"}]}`
++
++        Raises:
++            Mem0ValidationError: If input validation fails (invalid memory_type, messages format, etc.).
++            VectorStoreError: If vector store operations fail.
++            GraphStoreError: If graph store operations fail.
++            EmbeddingError: If embedding generation fails.
++            LLMError: If LLM operations fail.
++            DatabaseError: If database operations fail.
++        """
++
++        sample_id = metadata.get("sample_id") if metadata and isinstance(metadata, dict) else None
++        user_list = metadata.get("user") if metadata and isinstance(metadata, dict) else None
++        merged_messages = merge_consecutive_messages(messages)
++
++        rounds = []
++        i = 0
++        while i < len(merged_messages) - 1:
++            if merged_messages[i]["role"] == "user" and merged_messages[i + 1]["role"] == "assistant":
++                rounds.append([merged_messages[i], merged_messages[i + 1]])
++                i += 2
++            elif merged_messages[i]["role"] == "assistant" and merged_messages[i + 1]["role"] == "user":
++                i += 1
++            else:
++                i += 1
++
++        if len(rounds) == 0:
++            logger.warning("No valid user-assistant message pairs found after merging. No memory added.")
++            return {"results": []}
++
++        all_person_memory_1 = []
++        all_person_memory_2 = []
++
++        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
++            future_to_idx = {
++                executor.submit(self._process_single_round, idx, rounds[idx], rounds, user_list, sample_id): idx
++                for idx in range(len(rounds))
++            }
++
++            # print(f"Submitted {len(future_to_idx)} tasks.")
++            for future in concurrent.futures.as_completed(future_to_idx):
++                idx = future_to_idx[future]
++                try:
++                    buffer_item, person_memories_1, person_memories_2 = future.result()
++                    if buffer_item is None:
++                        continue
++
++                    buffer_lock = self._get_buffer_lock(sample_id)
++                    with buffer_lock:
++                        if sample_id not in self.events_buffer:
++                            self.events_buffer[sample_id] = []
++
++                        for new_buffer in buffer_item:
++                            self.events_buffer[sample_id].append(new_buffer)
++
++                        if len(self.events_buffer[sample_id]) >= self.buffer_size:
++                            # print(f"sample_id {sample_id} 的缓冲区达到阈值 {self.buffer_size}，开始刷新...")
++                            self._flush_buffer(sample_id) # 在锁内调用 flush
++
++                    all_person_memory_1.extend(person_memories_1)
++                    all_person_memory_2.extend(person_memories_2)
++
++                except Exception as e:
++                    logger.error(f"Error processing round {idx}: {e}")
++
++        buffer_lock_final = self._get_buffer_lock(sample_id)
++        with buffer_lock_final:
++            if sample_id in self.events_buffer and self.events_buffer[sample_id]:
++                # print(f"循环结束，刷新 sample_id {sample_id} 的剩余缓冲区...")
++                self._flush_buffer(sample_id)
++
++
++        store_dir = self.faiss_dir
++
++        for key in ["person_1", "person_2"]:
++            self._load_or_create_index(sample_id, key, dim=len(all_person_memory_1[0]["embedding"]) if all_person_memory_1 else 1024)
++
++       # === 添加 person_1 memories ===
++        index_u1 = self.faiss_store[sample_id]["person_1"]
++        meta_u1 = self.metadata_store[sample_id]["person_1"]
++        for mem in all_person_memory_1:
++            emb = np.array(mem["embedding"], dtype=np.float32)
++            emb = emb / np.linalg.norm(emb)
++            index_u1.add(emb.reshape(1, -1))
++            meta_u1.append({
++                "summary": mem["summary"],
++                "user": mem["user"],
++                "sample_id": mem["sample_id"],
++                "round_index": mem["round_index"],
++                "timestamp": mem["timestamp"]
++            })
++
++        # === 添加 person_2 memories ===
++        index_u2 = self.faiss_store[sample_id]["person_2"]
++        meta_u2 = self.metadata_store[sample_id]["person_2"]
++        for mem in all_person_memory_2:
++            emb = np.array(mem["embedding"], dtype=np.float32)
++            emb = emb / np.linalg.norm(emb)
++            index_u2.add(emb.reshape(1, -1))
++            meta_u2.append({
++                "summary": mem["summary"],
++                "user": mem["user"],
++                "sample_id": mem["sample_id"],
++                "round_index": mem["round_index"],
++                "timestamp": mem["timestamp"]
++            })
++
++        # === 保存 FAISS 索引和元数据 ===
++        self._save_faiss_index(sample_id, "person_1")
++        self._save_faiss_index(sample_id, "person_2")
++
++        return
++    def search(
++        self,
++        query: str,
++        *,
++        user_id: Optional[str] = None,
++        agent_id: Optional[str] = None,
++        run_id: Optional[str] = None,
++        limit: int = 5,
++        filters: Optional[Dict[str, Any]] = None,
++        threshold: Optional[float] = None,
++        rerank: bool = True,
++    ):
++        """
++        Searches for memories based on a query
++        Args:
++            query (str): Query to search for.
++            user_id (str, optional): ID of the user to search for. Defaults to None.
++            agent_id (str, optional): ID of the agent to search for. Defaults to None.
++            run_id (str, optional): ID of the sample to search for. Defaults to None.
++            limit (int, optional): Limit the number of results. Defaults to 100.
++            filters (dict, optional): Legacy filters to apply to the search. Defaults to None.
++            threshold (float, optional): Minimum score for a memory to be included in the results. Defaults to None.
++            filters (dict, optional): Enhanced metadata filtering with operators:
++                - {"key": "value"} - exact match
++                - {"key": {"eq": "value"}} - equals
++                - {"key": {"ne": "value"}} - not equals
++                - {"key": {"in": ["val1", "val2"]}} - in list
++                - {"key": {"nin": ["val1", "val2"]}} - not in list
++                - {"key": {"gt": 10}} - greater than
++                - {"key": {"gte": 10}} - greater than or equal
++                - {"key": {"lt": 10}} - less than
++                - {"key": {"lte": 10}} - less than or equal
++                - {"key": {"contains": "text"}} - contains text
++                - {"key": {"icontains": "text"}} - case-insensitive contains
++                - {"key": "*"} - wildcard match (any value)
++                - {"AND": [filter1, filter2]} - logical AND
++                - {"OR": [filter1, filter2]} - logical OR
++                - {"NOT": [filter1]} - logical NOT
++
++        Returns:
++            dict: A dictionary containing the search results, typically under a "results" key,
++                  and potentially "relations" if graph store is enabled.
++                  Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
++        """
++
++        if not run_id:
++            raise ValueError("run_id is required for search operation")
++
++        try:
++            query_embedding_response = self.emb_client.embeddings.create(
++                model=self.emb_model,
++                input=query
++            )
++            query_embedding = np.array(query_embedding_response.data[0].embedding, dtype=np.float32)
++            query_embedding = query_embedding / np.linalg.norm(query_embedding)
++        except Exception as e:
++            raise Exception(f"Failed to generate query embedding: {str(e)}")
++
++        for key in ["events", "person_1", "person_2"]:
++            self._load_or_create_index(run_id, key)
++
++        results = {"events": [], "person_1": [], "person_2": [], "combined": []}
++        def _search_in_index(key, lim):
++            index = self.faiss_store[run_id][key]
++            metadata = self.metadata_store[run_id][key]
++            if index.ntotal == 0:
++                return []
++            D, I = index.search(query_embedding.reshape(1, -1), lim)
++            res = []
++            for i, score in zip(I[0], D[0]):
++                if i == -1:
++                    continue
++                if threshold is not None and score < threshold:
++                    continue
++                res.append(metadata[i]["summary"])
++            return res
++
++        results["events"] = _search_in_index("events", limit)
++        results["person_1"] = _search_in_index("person_1", limit)
++        results["person_2"] = _search_in_index("person_2", limit)
++        results["combined"] = results["events"] + results["person_1"] + results["person_2"]
++
++        return " ".join(results["combined"])
++
++    # ########### multi modal memory ###########
++
++    def add_mm(
++        self,
++        video_path: str,
++        *,
++        frames_root: str = "video/frames",
++        captions_root: str = "video/captions",
++        vdb_root: str = "video/vdb",
++        clip_secs: int = None,
++        emb_dim: int = None,
++        subtitle_path: str | None = None,
++    ):
++        """
++        Multimodal data preprocessing entry point:
++        1) decode_video_to_frames -> frames
++        2) process_video          -> captions.json
++        3) init_single_video_db   -> *_vdb.json
++
++        If target files/directories already exist at any stage, skip that stage and continue.
++
++        Args:
++            video_path: Path to the source video file, e.g., "video/3EQLFHRHpag.mp4"
++            frames_root: Root directory for frame output, e.g., "video/frames"
++            captions_root: Root directory for captions.json output, e.g., "video/captions"
++            vdb_root: Root directory for vdb.json output, e.g., "video/vdb"
++            clip_secs: Optional, if not None, overrides config.CLIP_SECS
++            emb_dim: Optional, if not None, used as embedding dimension for init_single_video_db;
++                     if None, reads from config.LOCAL_EMBEDDING_LARGE_DIM
++            subtitle_path: Optional, path to subtitle file passed to process_video; None means no subtitles
++        """
++        # 1. Parse video name (without extension)
++        video_abs = os.path.abspath(video_path)
++        video_name = os.path.splitext(os.path.basename(video_abs))[0]
++
++        # 2. Construct directory/file paths for each level
++        frames_root_abs = os.path.abspath(os.path.join(BASE_DIR, frames_root))
++        captions_root_abs = os.path.abspath(os.path.join(BASE_DIR, captions_root))
++        vdb_root_abs = os.path.abspath(os.path.join(BASE_DIR, vdb_root))
++
++        
++        video_frames_dir = os.path.join(frames_root_abs, video_name, "frames")
++        
++        video_caption_dir = os.path.join(captions_root_abs, video_name)
++        caption_json_path = os.path.join(video_caption_dir, "captions.json")
++        
++        video_vdb_dir = os.path.join(vdb_root_abs, video_name)
++        vdb_json_path = os.path.join(video_vdb_dir, f"{video_name}_vdb.json")
++
++        os.makedirs(frames_root_abs, exist_ok=True)
++        os.makedirs(captions_root_abs, exist_ok=True)
++        os.makedirs(vdb_root_abs, exist_ok=True)
++
++        # ---------------- ① decode_video_to_frames ----------------
++        if os.path.isdir(video_frames_dir) and any(
++            f.endswith(".jpg") for f in os.listdir(video_frames_dir)
++        ):
++            logger.info(f"[add_mm] Skip decoding: frames already exist at {video_frames_dir}")
++        else:
++            logger.info(f"[add_mm] Decoding video -> frames: {video_path} -> {video_frames_dir}")
++            os.makedirs(os.path.dirname(video_frames_dir), exist_ok=True)
++            # Adjust parameters according to the decode_video_to_frames interface
++            decode_video_to_frames(
++                video_path=video_abs,
++                frames_dir=video_frames_dir,
++            )
++
++        # ---------------- ② process_video -> captions.json --------
++        if os.path.isfile(caption_json_path):
++            logger.info(f"[add_mm] Skip captioning: {caption_json_path} already exists")
++        else:
++            logger.info(f"[add_mm] Captioning frames -> {caption_json_path}")
++            os.makedirs(video_caption_dir, exist_ok=True)
++            
++            # if clip_secs is not None:
++            #     import config as _cfg
++            #     _cfg.CLIP_SECS = clip_secs  # Simple override, takes effect globally
++
++            process_video(
++                frame_folder=video_frames_dir,
++                output_caption_folder=video_caption_dir,
++                subtitle_file_path=subtitle_path,
++            )
++
++        # ---------------- ③ init_single_video_db -> vdb.json ------ 
++        if os.path.isfile(vdb_json_path):
++            logger.info(f"[add_mm] Skip building VDB: {vdb_json_path} already exists")
++        else:
++            logger.info(f"[add_mm] Building VDB -> {vdb_json_path}")
++            os.makedirs(video_vdb_dir, exist_ok=True)
++            import config as _cfg
++            dim = emb_dim if emb_dim is not None else _cfg.LOCAL_EMBEDDING_LARGE_DIM
++
++            init_single_video_db(
++                video_caption_json_path=caption_json_path,
++                output_video_db_path=vdb_json_path,
++                emb_dim=dim,
++            )
++
++        return {
++            "video_name": video_name,
++            "frames_dir": video_frames_dir,
++            "caption_json": caption_json_path,
++            "vdb_json": vdb_json_path,
++        }
++
++
++
++    def search_mm(
++        self,
++        question: str,
++        video_db_path: str = "video/vdb/3EQLFHRHpag_vdb.json",
++        video_caption_path: str = "video/captions/captions.json",
++        max_iterations: int = 15,
++    ):
++        """
++        Multimodal memory search: Invokes MMCoreAgent to perform reasoning on a given video and multiple-choice question.
++
++        Args:
++            question: A question string with A/B/C/D options
++            video_db_path: Path to the video vdb, relative to the telemem_mm directory
++            video_caption_path: Path to the video caption json, relative to the telemem_mm directory
++            max_iterations: Maximum number of reasoning iterations for MMCoreAgent
++
++        Returns:
++            messages: List of messages returned by MMCoreAgent.run(question)
++        """
++        
++        agent = MMCoreAgent(
++            video_db_path=video_db_path,
++            video_caption_path=video_caption_path,
++            max_iterations=max_iterations,
++        )
++        messages = agent.run(question)
++        return messages
+diff --git a/vendor/TeleMem/__init__.py b/vendor/TeleMem/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/vendor/TeleMem/config.yaml b/vendor/TeleMem/config.yaml
+new file mode 100644
+index 0000000..f9ec5a6
+--- /dev/null
++++ b/vendor/TeleMem/config.yaml
+@@ -0,0 +1,69 @@
++# config.yaml
++llm:
++  provider: openai
++  config:
++    model: qwen3-8b
++    openai_base_url: http://localhost:4000/v1
++    api_key: sk-xxx
++
++embedder:
++  provider: openai
++  config:
++    model: qwen3-8b-embedding
++    openai_base_url: http://localhost:4000/v1
++    api_key: sk-xxx
++
++vector_store:
++  provider: faiss
++  config:
++    collection_name: telemem
++    path: db/faiss_db
++
++history_db_path: db/history.db
++
++buffer_size: 64
++similarity_threshold: 0.95
++faiss_dir: "./faiss_db"
++
++llm_client: "http://localhost:4000/v1"
++llm_model: "qwen3-8b"
++llm_api_key: "EMPTY"
++
++emb_client: "http://localhost:4000/v1"
++emb_model: "qwen3-8b-embedding"
++emb_api_key: "EMPTY"
++emb_dim: 4096
++
++vlm_client: "http://localhost:4000/v1"
++vlm_model: "qwen3-omni"
++vlm_api_key: "EMPTY"
++
++
++# ================ mm_utils multi modal setting ================
++# video download and segmentation
++VIDEO_DATABASE_FOLDER: "./videomme_database/"
++VIDEO_RESOLUTION: "360"
++VIDEO_FPS: 2
++CLIP_SECS: 10
++
++# model configuration
++OPENAI_API_KEY: null
++
++# Azure OpenAI
++AOAI_CAPTION_VLM_ENDPOINT_LIST: []
++AOAI_CAPTION_VLM_MODEL_NAME: "gpt-4.1-mini"
++AOAI_ORCHESTRATOR_LLM_ENDPOINT_LIST: []
++AOAI_ORCHESTRATOR_LLM_MODEL_NAME: "o3"
++AOAI_TOOL_VLM_ENDPOINT_LIST: []
++AOAI_TOOL_VLM_MODEL_NAME: "gpt-4.1-mini"
++AOAI_TOOL_VLM_MAX_FRAME_NUM: 50
++AOAI_EMBEDDING_RESOURCE_LIST: []
++AOAI_EMBEDDING_LARGE_MODEL_NAME: "text-embedding-3-large"
++AOAI_EMBEDDING_LARGE_DIM: 3072
++
++# agent and tool setting
++LITE_MODE: true
++GLOBAL_BROWSE_TOPK: 300
++OVERWRITE_CLIP_SEARCH_TOPK: 0
++SINGLE_CHOICE_QA: true
++MAX_ITERATIONS: 3
+\ No newline at end of file
+diff --git a/vendor/TeleMem/mm_utils/__init__.py b/vendor/TeleMem/mm_utils/__init__.py
+new file mode 100644
+index 0000000..e69de29
+diff --git a/vendor/TeleMem/mm_utils/build_database.py b/vendor/TeleMem/mm_utils/build_database.py
+new file mode 100644
+index 0000000..a012b12
+--- /dev/null
++++ b/vendor/TeleMem/mm_utils/build_database.py
+@@ -0,0 +1,408 @@
++import json
++import multiprocessing
++import os
++from typing import Annotated as A
++
++import numpy as np
++from nano_vectordb import NanoVectorDB
++from tqdm import tqdm
++
++# import config as config
++from func_call_shema import doc as D
++from memory_utils import AzureOpenAIEmbeddingService, call_openai_model_with_tools
++
++from memory_utils import load_config
++
++PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
++cfg = load_config(os.environ["MM_CONFIG_PATH"])
++
++def frame_inspect_tool(
++    database: A[NanoVectorDB, D("The database containing video metadata. Must be an instance of NanoVectorDB.")], 
++    question: A[str, D("The specific detailed question to ask about the video content during the specified time ranges. No need to add time ranges in the question.")], 
++    time_ranges_hhmmss: A[list[tuple], D("A list of tuples containing start and end times in HH:MM:SS format. If the time range is longer than 50 seconds, the function samples 50 evenly distributed frames.  Otherwise, it uses all frames within the specified range.")], 
++) -> str:
++    """
++    Crop the video frames based on the time ranges and ask the model a detailed question about the cropped video clips.
++    Returns:
++        str: The model's response to the question. If no relevant content is found within the time range,
++             returns an error message: "Error: Cannot find corresponding result in the given time range."
++    """
++
++    assert isinstance(database, NanoVectorDB), "Database must be an instance of NanoVectorDB"
++    video_length_secs = convert_hhmmss_to_seconds(database.get_additional_data()['video_length'])
++    video_meta = database.get_additional_data()
++    video_file_root = video_meta['video_file_root']
++    fps = video_meta.get('fps', cfg['VIDEO_FPS']) # config.VIDEO_FPS
++    time_ranges_secs = []
++    for time_range in time_ranges_hhmmss:
++        start_secs = convert_hhmmss_to_seconds(time_range[0])
++        end_secs = convert_hhmmss_to_seconds(time_range[1])
++        if start_secs > video_length_secs:
++            raise ValueError(f"One of start time {time_range[0]} exceeds video length {video_length_secs}")
++        end_secs = min(end_secs, video_length_secs)
++        time_ranges_secs.append((start_secs, end_secs))
++
++    time_ranges_secs.sort(key=lambda x: x[0])  # Sort by start time
++    # Calculate total time across all ranges
++    total_time = sum(end - start for start, end in time_ranges_secs)
++    
++    # Maximum number of timepoints to sample
++    max_timepoints = cfg['AOAI_TOOL_VLM_MAX_FRAME_NUM']
++    timepoints = []
++
++    assert total_time > 0 and max_timepoints > 0 
++
++    # ① Uniformly sample on the flattened timeline
++    #    endpoint=False ensures the last sample point < total_time
++    offsets = np.linspace(
++        0, total_time,
++        num=max_timepoints,
++        endpoint=False,
++        dtype=float
++    )
++
++    # ② Calculate prefix sums for each segment, used to map offsets back to actual timestamps
++    prefix_len = []          # (cumulative length, segment start, segment length)
++    acc = 0
++    for start, end in time_ranges_secs:
++        seg_len   = end - start
++        prefix_len.append((acc, start, seg_len))
++        acc += seg_len
++
++    # ③ Complete the mapping
++    for off in offsets:
++        # off = int(round(off))          # Ensure it is an integer
++        for base, seg_start, seg_len in prefix_len:
++            if off < base + seg_len:   # Find the corresponding segment
++                timepoints.append(seg_start + (off - base))
++                break
++    # ④ Convert the sampled timestamps (seconds) to frame indices according to VIDEO_FPS
++    max_frame_idx = int(video_length_secs * fps) - 1   # last valid frame index
++
++    framepoints = [
++        min(max(int(round(ts * fps)), 0), max_frame_idx)  # clamp to [0, max_frame_idx]
++        for ts in timepoints
++    ]
++    framepoints = sorted(set(framepoints))[:max_timepoints]
++
++
++    input_msgs = [
++        {
++            "role": "system",
++            "content": "You are a helpful assistant to answer questions."
++        },
++        {
++            "role": "user",
++            "content": "Carefully watch the video frames. Pay attention to the cause and sequence of events, the detail and movement of objects and the action and pose of persons.\n\nBased on your observations, if you find content that can answer the question. If no relevant content is found within the given time range, return: `Error: Cannot find corresponding result in the given time range.`. \nQuestion: {question}\n",
++        },
++    ]
++
++    input_msgs[1]['content'] = input_msgs[1]['content'].format(question=question)
++
++    files = [
++        os.path.join(video_file_root, "frames", f"frame_n{fn:06d}.jpg") for fn in framepoints
++    ]
++    msgs = call_openai_model_with_tools(
++        messages=input_msgs,
++        endpoints=cfg['AOAI_TOOL_VLM_ENDPOINT_LIST'],
++        model_name=cfg['AOAI_TOOL_VLM_MODEL_NAME'],
++        api_key=cfg['OPENAI_API_KEY'],
++        image_paths=files,
++        temperature=0,
++        max_tokens=512,
++    )
++    if msgs is None:
++        raise ValueError("No response from the model")
++    return msgs["content"]
++
++def clip_search_tool(
++        database: A[NanoVectorDB, D("The database object that supports querying with embeddings.")],
++        event_description: A[str, D("A textual description of the event to search for.")],
++        top_k: A[int, D("The maximum number of top results to retrieve. Just use the default value.")] = 16
++) -> str:
++    """
++    Searches for events in a video clip database based on a given event description and retrieves the top-k most relevant video clip captions.
++
++    Returns:
++        str: A formatted string containing the concatenated captions of the searched video clip scripts.
++
++    Notes:
++        - This function utilizes the OpenAI Embedding Service to generate embeddings for the input text.
++        - Use default values for `top_k` to limit the number of results returned.
++    """
++    assert isinstance(database, NanoVectorDB), "Database must be an instance of NanoVectorDB"
++    query_emb = AzureOpenAIEmbeddingService.get_embeddings(
++        endpoints=cfg['emb_client'],
++        model_name=cfg['emb_model'],
++        input_text=[event_description],
++        api_key=cfg['emb_api_key'],
++        use_local=True,
++    )[0]['embedding']
++    results = database.query(
++        query_emb,
++        top_k=top_k,
++    )
++    captions = [
++        (data['time_start_secs'], data['caption'])
++        for i, data in enumerate(results)
++    ]
++    captions = sorted(captions, key=lambda x: x[0])
++    captions = "\n".join([cap[1] for cap in captions])
++    return f"Here is the searched video clip scripts:\n\n" + captions
++
++
++def global_browse_tool(
++        database: A[NanoVectorDB, D("The database object that supports querying with embeddings.")],
++        query: A[str, D("A textual description which will be used to search for relevant video clips in the database.")],
++) -> str:
++    """
++    Analyzes a video database to answer a detailed question by first searching for relevant video clips and then generating a comprehensive answer based on their captions.
++
++    Args:
++        database (NanoVectorDB): The database object that supports querying with embeddings.
++        query (str): A textual description or question to search for in the video.
++
++    Returns:
++        str: A JSON string containing the subject registry and the model's answer to the query based on the most relevant video clips.
++    """
++    # search related clips
++    assert isinstance(database, NanoVectorDB), "Database must be an instance of NanoVectorDB"
++    query_emb = AzureOpenAIEmbeddingService.get_embeddings(
++        endpoints=cfg['emb_client'],
++        model_name=cfg['emb_model'],
++        input_text=[query],
++        api_key=cfg['emb_dim'],
++        use_local=True,
++    )[0]['embedding']
++    results = database.query(
++        query_emb,
++        top_k=cfg['GLOBAL_BROWSE_TOPK'],
++    )
++    captions = [
++        (data['time_start_secs'], data['caption'])
++        for i, data in enumerate(results)
++    ]
++    captions = sorted(captions, key=lambda x: x[0])
++    captions = "\n".join([cap[1] for cap in captions])
++
++    clip_captions = f"Here is the searched video clip scripts:\n\n" + captions
++
++    # ask the question
++
++    input_msgs = [
++        {
++            "role": "system",
++            "content": "You are a knowledgeable assistant specializing in analyzing video content and providing detailed, insightful answers."
++        },
++        {
++            "role": "user",
++            "content": (
++                "Below are descriptions of video clips, each with its corresponding timestamp. "
++                "Carefully review the sequence of events, the details and movements of objects, and the actions and poses of people. "
++                "Based on these observations, provide a thorough and specific answer to the following question, referencing key events and timestamps as appropriate.\n"
++                "Question: {question}\n\n{clip_captions}"
++            ),
++        },
++    ]
++
++    input_msgs[1]['content'] = input_msgs[1]['content'].format(question=query, clip_captions=clip_captions)
++
++    msgs = call_openai_model_with_tools(
++        messages=input_msgs,
++        endpoints=cfg['AOAI_TOOL_VLM_ENDPOINT_LIST'],
++        model_name=cfg['AOAI_TOOL_VLM_MODEL_NAME'],
++        api_key=cfg['OPENAI_API_KEY'],
++        temperature=0,
++        max_tokens=512,
++    )
++    if msgs is None:
++        raise ValueError("No response from the model")
++
++    subject_registry = database.get_additional_data()['subject_registry']
++    return json.dumps({'subject_registry': subject_registry, 'query_related_event': msgs["content"]})
++
++
++def convert_seconds_to_hhmmss(seconds):
++    hours = int(seconds // 3600)
++    seconds %= 3600
++    minutes = int(seconds // 60)
++    seconds %= 60
++    return f"{hours:02}:{minutes:02}:{seconds:02}"
++
++def convert_hhmmss_to_seconds(hhmmss):
++    hhmmss = hhmmss.split('.')[0]
++    parts = hhmmss.split(":")
++    if len(parts) < 2:
++        raise ValueError("Invalid time format. Expected HH:MM:SS.")
++    elif len(parts) == 2:
++        parts = ["00"] + parts
++    hours, minutes, seconds = map(int, parts)
++    return hours * 3600 + minutes * 60 + seconds
++
++def is_covered(d,N):
++    i=sorted((int(a),int(b))for a,b in(map(lambda x:x.split('_'),d)));c=0
++    return all(s==c and not (c:=e) for s,e in i) and c==N
++
++def init_single_video_db(video_caption_json_path, output_video_db_path, emb_dim):
++    vdb = NanoVectorDB(emb_dim, storage_file=output_video_db_path)
++    # with open(video_caption_json_path, "r") as f:
++    #     captions = json.load(f)
++    # subject_registry = captions.pop('subject_registry', captions.pop('character_registry', None))            
++    # video_length = max([float(k.split("_")[1]) for k in captions.keys()])
++    # if not is_covered(captions.keys(), video_length):
++    #     error_msg = (f"Fail to build video database for video {video_caption_json_path.split("/")[-3]}. Get None video clip captions for some clips in the video.")
++    #     raise ValueError(error_msg)
++    # video_length = convert_seconds_to_hhmmss(video_length)
++    if os.path.exists(output_video_db_path):
++        print(f"Database {output_video_db_path} already exists.")
++    else:
++        cap2emb_list = preprocess_captions(video_caption_json_path)
++        data = []
++        for idx, (timestamp, cap, emb) in enumerate(cap2emb_list):
++            t1 = convert_seconds_to_hhmmss(timestamp[0])
++            t2 = convert_seconds_to_hhmmss(timestamp[1])
++            prefix = f"[From {t1} to {t2} seconds]\n"
++            data.append(
++                {
++                    "__vector__": np.array(emb),
++                    "time_start_secs": timestamp[0],
++                    "time_end_secs": timestamp[1],
++                    "caption": prefix + cap['caption'],
++                }
++            )
++        _ = vdb.upsert(data)
++        with open(video_caption_json_path, "r") as f:
++            captions = json.load(f)
++        subject_registry = captions.pop('subject_registry', captions.pop('character_registry', None))          
++        video_length = max([float(k.split("_")[1]) for k in captions.keys()])
++        video_length = convert_seconds_to_hhmmss(video_length)
++        addtional_data = {
++            'subject_registry': subject_registry,
++            'video_length': video_length,
++            'video_file_root': os.path.dirname(os.path.dirname(video_caption_json_path)),
++            'fps': cfg['VIDEO_FPS'],
++        }
++        vdb.store_additional_data(**addtional_data)
++        vdb.save()
++    return vdb
++
++def preprocess_captions(caption_json_path):
++    with open(caption_json_path, "r") as f:
++        captions = json.load(f)
++    scripts = []
++    captions.pop('subject_registry', None)
++    captions.pop('character_registry', None)
++    for idx, (timestamp, cap_info) in enumerate(captions.items()):
++        if cap_info.get('caption') is None or len(cap_info['caption']) == 0:
++            print(f"Empty caption information for {timestamp} in {caption_json_path}")
++            continue
++        elif isinstance(cap_info['caption'], list):
++            cap_info['caption'] = cap_info['caption'][0]
++        elif not isinstance(cap_info['caption'], str):
++            print(f"Invalid caption type for {cap_info['caption']}")
++            cap_info['caption'] = str(cap_info['caption'])
++        timestamp = list(map(float, timestamp.split("_")))
++        scripts.append((timestamp, cap_info['caption'], cap_info))
++
++    # batchify
++    batch_size = 128
++    batched_scripts = []
++    print(f"Embedding {len(scripts)} captions...")
++    for i in range(0, len(scripts), batch_size):
++        batch = scripts[i:i+batch_size]
++        batched_scripts.append(batch)
++    cap2emb_list = []
++    with multiprocessing.Pool(os.cpu_count() // 2) as pool:
++        with tqdm(total=len(scripts), desc="Embedding captions...") as pbar:
++            for result in pool.imap_unordered(
++                single_batch_embedding_task,
++                batched_scripts,
++            ):
++                cap2emb_list.extend(result)
++                pbar.update(len(result))
++    return cap2emb_list
++
++def single_batch_embedding_task(data):
++    timestamps, captions, cap_infos = map(list, (zip(*data)))
++    embs = AzureOpenAIEmbeddingService.get_embeddings(
++        endpoints=cfg['emb_client'],
++        model_name=cfg['emb_model'],
++        input_text=captions,
++        # api_key=cfg['emb_api_key'],
++        use_local=True,
++    )
++    max_tries = 3
++    while embs is None or len(embs) != len(captions):
++        max_tries -= 1
++        if max_tries < 0:
++            raise ValueError(f"Failed to get embeddings for {timestamps} {captions}")
++        print(f"Error in embedding {timestamps} {captions} retrying...")
++        embs = AzureOpenAIEmbeddingService.get_embeddings(
++            endpoints=cfg['emb_client'],
++            model_name=cfg['emb_model'],
++            input_text=captions,
++            # api_key=cfg['emb_api_key'],
++            use_local=True,
++        )
++    return list(zip(timestamps, cap_infos, [d['embedding'] for d in embs]))
++
++if __name__ == "__main__":
++    # benchmark_metadata_path = "/home/xiaoyizhang/event_prediction_model/LVBench/data/video_info.meta.jsonl"
++    # video_caption_folder = "/data/xiaoyizhang/LVBench/"
++    # output_folder_name = "audio_segment_w_transcribe_0411"
++    # video_db_folder = "./lvbench_vdb/"
++    # os.makedirs(video_db_folder, exist_ok=True)
++    # embedding_dim = cfg['AOAI_EMBEDDING_LARGE_DIM']
++
++    # with open(benchmark_metadata_path, "r") as f:
++    #     lines = f.readlines()
++
++    # video_caption_json_path = "/gemini/space/linx/DeepVideoDiscovery/videomme_dvd/captions/videos_chunked_01/0ag_Qi5OEd0/captions.json"
++    # vdb_dir = "/gemini/space/linx/DeepVideoDiscovery/videomme_dvd/vdb/videos_chunked_01/"
++    # os.makedirs(vdb_dir, exist_ok=True)
++    # output_video_db_path = os.path.join(vdb_dir, "0ag_Qi5OEd0_vdb.json")
++    
++    # embedding_dim = cfg['emb_dim']
++    
++    # video_db = init_single_video_db(video_caption_json_path, output_video_db_path, embedding_dim)
++    # print("Done. VDB saved to:", output_video_db_path)
++
++    caption_root = "/gemini/space/linx/DeepVideoDiscovery/m3-agent_dvd/captions"
++    vdb_root     = "/gemini/space/linx/DeepVideoDiscovery/m3-agent_dvd/vdb/"
++
++    # 只创建总的 vdb_root 目录
++    os.makedirs(vdb_root, exist_ok=True)
++    
++
++    embedding_dim = cfg['emb_dim']
++
++    for video_name in os.listdir(caption_root):
++        video_caption_dir = os.path.join(caption_root, video_name)
++        if not os.path.isdir(video_caption_dir):
++            continue
++
++        caption_json_path = os.path.join(video_caption_dir, "captions.json")
++        if not os.path.exists(caption_json_path):
++            # 没有 caption.json，则跳过并打印 video 名字，不创建任何 vdb 子目录
++            print(f"Skip video {video_name}: captions.json not found.")
++            continue
++
++        # 只有在存在 caption.json 时才创建对应的 vdb 子目录
++        video_vdb_dir = os.path.join(vdb_root, video_name)
++        os.makedirs(video_vdb_dir, exist_ok=True)
++
++        # 构造 vdb 文件路径，命名规则：[video_name]_vdb.json
++        output_video_db_path = os.path.join(video_vdb_dir, f"{video_name}_vdb.json")
++
++        print(f"Building VDB for video {video_name} ...")
++
++        try:
++            video_db = init_single_video_db(
++                caption_json_path,
++                output_video_db_path,
++                embedding_dim,
++            )
++            print(f"Done. VDB saved to: {output_video_db_path}")
++        except Exception as e:
++            print(f"Error while building VDB for video {video_name}: {e}")
+\ No newline at end of file
+diff --git a/vendor/TeleMem/mm_utils/core.py b/vendor/TeleMem/mm_utils/core.py
+new file mode 100644
+index 0000000..ecdd563
+--- /dev/null
++++ b/vendor/TeleMem/mm_utils/core.py
+@@ -0,0 +1,349 @@
++import copy
++import json
++from typing import Annotated as A
++from typing import Literal as L
++
++# import config as config
++from build_database import (clip_search_tool, frame_inspect_tool,
++                                global_browse_tool, init_single_video_db)
++from func_call_shema import as_json_schema
++from func_call_shema import doc as D
++from memory_utils import call_openai_model_with_tools, load_config
++from concurrent.futures import ThreadPoolExecutor, as_completed
++import re
++import os
++import sys
++
++# from mm_utils.memory_utils import load_config
++
++PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
++cfg = load_config(os.environ["MM_CONFIG_PATH"])
++
++
++TOPK = 16
++
++class StopException(Exception):
++    """
++    Stop Execution by raising this exception (Signal that the task is Finished).
++    """
++
++
++def finish(answer: A[str, D("Answer to the user's question.")]) -> None:
++    """Call this function after confirming the answer of the user's question, and finish the conversation."""
++    raise StopException(answer)
++
++
++class MMCoreAgent:
++    def __init__(self, video_db_path, video_caption_path, max_iterations):
++        self.tools = [frame_inspect_tool, clip_search_tool, global_browse_tool, finish]
++        if cfg['LITE_MODE']:#config.LITE_MODE:
++            self.tools.remove(frame_inspect_tool)
++        self.name_to_function_map = {tool.__name__: tool for tool in self.tools}
++        self.function_schemas = [
++            {"function": as_json_schema(func), "type": "function"}
++            for func in self.name_to_function_map.values()
++        ]
++        self.video_db = init_single_video_db(video_caption_path, video_db_path, cfg['emb_dim']) # config.LOCAL_EMBEDDING_LARGE_DIM
++        self.max_iterations = max_iterations
++        self.messages = self._construct_messages()
++
++    def _construct_messages(self):
++        messages = [
++            {
++                "role": "system",
++                "content": """You are a helpful assistant who answers multi-step questions by sequentially invoking functions. Follow the THINK → ACT → OBSERVE loop:
++  • THOUGHT Reason step-by-step about which function to call next.
++  • ACTION   Call exactly one function that moves you closer to the final answer.
++  • OBSERVATION Summarize the function's output.
++You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls.
++Only pass arguments that come verbatim from the user or from earlier function outputs—never invent them. Continue the loop until the user's query is fully resolved, then end your turn with the final answer. If you are uncertain about code structure or video content, use the available tools to inspect rather than guessing. Plan carefully before each call and reflect on every result. Do not rely solely on blind function calls, as this degrades reasoning quality. Timestamps may be formatted as 'HH:MM:SS' or 'MM:SS'."""
++            },
++            {
++                "role": "user",
++                "content": """Carefully read the timestamps and narration in the following script, paying attention to the causal order of events, object details and movements, and people's actions and poses.
++
++Here are tools you can use to reveal your reasoning process whenever the provided information is insufficient.
++
++• To get a global information about events and main subjects in the video, use `global_browse_tool`.
++• To search without a specific timestamp, use `clip_search_tool`.
++• If the retrieved material lacks precise, question-relevant detail (e.g., an unknown name), call `frame_inspect_tool` with a list of time ranges (list[tuple[HH:MM:SS, HH:MM:SS]]).
++• Whenever you are uncertain of an answer after searching, inspect frames in the relevant intervals with `frame_inspect_tool`.
++• After locating an answer in the script, always make a **CONFIRM** with `frame_inspect_tool` query.
++
++
++You can first use `global_browse_tool` to a global information about this video, then invoke multiple times of these tools to prgressively find the answer.
++
++Based on your observations and tool outputs, provide a concise answer that directly addresses the question. \n
++
++Total video length: VIDEO_LENGTH seconds.
++
++Question: QUESTION_PLACEHOLDER"""
++            },
++        ]
++        video_length = self.video_db.get_additional_data()['video_length']
++        messages[-1]['content'] = messages[-1]['content'].replace("VIDEO_LENGTH", str(video_length))
++        return messages
++
++    # ------------------------------------------------------------------ #
++    # Helper methods
++    # ------------------------------------------------------------------ #
++    def _append_tool_msg(self, tool_call_id, name, content, msgs):
++        msgs.append(
++            {
++                "tool_call_id": tool_call_id,
++                "role": "tool",
++                "name": name,
++                "content": content,
++            }
++        )
++
++    def _exec_tool(self, tool_call, msgs):
++        name = tool_call["function"]["name"]
++        if name not in self.name_to_function_map:
++            self._append_tool_msg(tool_call["id"], name, f"Invalid function name: {name!r}", msgs)
++            return
++
++        # Parse arguments
++        try:
++            args = json.loads(tool_call["function"]["arguments"])
++        except json.JSONDecodeError as exc:
++            raise StopException(f"Error decoding arguments: {exc!s}")
++
++        if "database" in args:
++            args["database"] = self.video_db
++        
++        if "topk" in args:
++            if cfg['OVERWRITE_CLIP_SEARCH_TOPK'] > 0:
++                args["topk"] = cfg['OVERWRITE_CLIP_SEARCH_TOPK']
++
++        # Call the tool
++        try:
++            print(f"Calling function `{name}` with args: {args}")
++            result = self.name_to_function_map[name](**args)
++            self._append_tool_msg(tool_call["id"], name, result, msgs)
++        except StopException as exc:  # graceful stop
++            print(f"Finish task with message: '{exc!s}'")
++            raise
++
++    # ------------------------------------------------------------------ #
++    # Main loop
++    # ------------------------------------------------------------------ #
++    def run(self, question) -> list[dict]:
++        """
++        Run the ReAct-style loop with OpenAI Function Calling.
++        """
++
++        msgs = copy.deepcopy(self.messages)
++        msgs[-1]["content"] = msgs[-1]["content"].replace("QUESTION_PLACEHOLDER", question)
++
++        for i in range(self.max_iterations):
++            # Force a final `finish` on the last iteration to avoid hanging
++            if i == self.max_iterations - 1:
++                msgs.append(
++                    {
++                        "role": "user",
++                        "content": "Please call the `finish` function to finish the task.",
++                    }
++                )
++
++            response = call_openai_model_with_tools(
++                msgs,
++                endpoints=cfg['vlm_client'],
++                model_name=cfg['vlm_model'],
++                tools=self.function_schemas,
++                temperature=0.0,
++                # api_key=cfg['vlm_api_key'],
++                use_local=True,
++            )
++            if response is None:
++                return None
++
++            response.setdefault("role", "assistant")
++            msgs.append(response)
++
++            # Execute any requested tool calls
++            try:
++                for tool_call in response.get("tool_calls", []):
++                    self._exec_tool(tool_call, msgs)
++            except StopException:
++                return msgs
++
++        return msgs
++
++    def parallel_run(self, questions, max_workers=4) -> list[list[dict]]:
++        """
++        Run multiple questions in parallel.
++        """
++        results = []
++        results = [None] * len(questions)
++        with ThreadPoolExecutor(max_workers=max_workers) as executor:
++            future_to_index = {
++                executor.submit(self.run, q): idx
++                for idx, q in enumerate(questions)
++            }
++            for future in as_completed(future_to_index):
++                idx = future_to_index[future]
++                try:
++                    results[idx] = future.result()
++                except Exception as e:
++                    print(f"Error processing question: {e}")
++                    results[idx] = None
++        return results
++
++    # ------------------------------------------------------------------ #
++    # Streaming (generator) loop
++    # ------------------------------------------------------------------ #
++    def stream_run(self, question):
++        """
++        A generator version of `run`.  
++        Yields:
++            dict: every assistant / tool message produced during reasoning.
++        """
++        msgs = copy.deepcopy(self.messages)
++        msgs[-1]["content"] = msgs[-1]["content"].replace("QUESTION_PLACEHOLDER", question)
++
++        for i in range(self.max_iterations):
++            # Force a final `finish` on the last iteration
++            if i == self.max_iterations - 1:
++                final_usr_msg = {
++                    "role": "user",
++                    "content": "Please call the `finish` function to finish the task.",
++                }
++                msgs.append(final_usr_msg)
++                # Don't yield user messages to the UI
++
++            response = call_openai_model_with_tools(
++                msgs,
++                endpoints=cfg['vlm_client'],
++                model_name=cfg['vlm_model'],
++                tools=self.function_schemas,
++                temperature=0.0,
++                # api_key=cfg['vlm_api_key'],
++                use_local=True,
++            )
++            if response is None:
++                return
++
++            response.setdefault("role", "assistant")
++            msgs.append(response)
++            yield response  # ← stream assistant reply
++
++            # Execute any requested tool calls
++            try:
++                for tool_call in response.get("tool_calls", []):
++                    # Yield a formatted message about the tool being called
++                    tool_name = tool_call.get("function", {}).get("name", "unknown")
++                    tool_args = tool_call.get("function", {}).get("arguments", "{}")
++                    yield {
++                        "role": "tool_call",
++                        "name": tool_name,
++                        "arguments": tool_args
++                    }
++                    
++                    self._exec_tool(tool_call, msgs)
++                    # Only yield the tool result message
++                    if msgs[-1].get("role") == "tool":
++                        yield msgs[-1]  # ← stream tool observation
++            except StopException:
++                return
++
++
++def single_run_wrapper(info) -> dict:
++    qid, video_db_path, video_caption_path, question = info
++    agent = MMCoreAgent(video_db_path, video_caption_path, question)
++    msgs = agent.run()
++    return {qid: msgs}
++
++def _parse_choice_from_text(text: str) -> str | None:
++    """
++    Parse an option letter A/B/C/D from an assistant content string.
++    Priority matching patterns:
++      - Final Answer: C
++      - Answer: C
++      - Finalize the answer with option C.
++      - The correct answer is option C.
++    Fallback: if the entire text is a single character in ABCD, treat it as the answer.
++    """
++    if not text:
++        return None
++
++    s = text.strip()
++    if not s:
++        return None
++
++    # 1) Single letter only
++    if len(s) == 1 and s in "ABCD":
++        return s
++
++    # 2) Final Answer / Answer / final answer is C
++    m = re.search(
++        r'\b(?:final(?:ize)?\s+answer|answer)\s*(?:is|:)?\s*([ABCD])\b',
++        s,
++        flags=re.IGNORECASE
++    )
++    if m:
++        return m.group(1)
++
++    # 3) "option C" / "option B" patterns
++    m = re.search(
++        r'\boption\s+([ABCD])\b',
++        s,
++        flags=re.IGNORECASE
++    )
++    if m:
++        return m.group(1)
++
++    # 4) Special pattern: (B) Global warming
++    m = re.search(
++        r'\(([ABCD])\)\s*[A-Za-z]',
++        s
++    )
++    if m:
++        return m.group(1)
++
++    # 5) If content is very short (<= 5 chars), find the only A-D letter as fallback
++    if len(s) <= 5:
++        letters = [ch for ch in s if ch in "ABCD"]
++        if len(letters) == 1:
++            return letters[0]
++
++    return None
++
++
++def extract_choice_from_msg(msg: list[dict]) -> str | None:
++    """
++    Extract the final choice from a message list (conversation messages) for a single question:
++      1. Filter out all messages with role == 'assistant';
++      2. Iterate through these messages from back to front;
++      3. Skip messages with empty content, whitespace only, or finish() / FINISH / finish;
++      4. Once an A/B/C/D option is parsed from a content, return that option;
++      5. If no option is found after iterating, return None.
++    """
++    if not msg:
++        return None
++
++    # Keep only assistant messages
++    assistants = [m for m in msg if isinstance(m, dict) and m.get("role") == "assistant"]
++    if not assistants:
++        return None
++
++    # Iterate from back to front
++    for m in reversed(assistants):
++        content = (m.get("content") or "").strip()
++        if not content:
++            continue
++
++        # Skip finish-like content
++        lower = content.lower()
++        if lower in {"finish", "finish()", "`finish`", "finishing", "fin"}:
++            continue
++
++        # Allow content to contain other text, as long as an option can be parsed from it
++        choice = _parse_choice_from_text(content)
++        if isinstance(choice, str) and choice in "ABCD":
++            return choice
++
++    # Not found
++    return None
++
+diff --git a/vendor/TeleMem/mm_utils/frame_caption.py b/vendor/TeleMem/mm_utils/frame_caption.py
+new file mode 100644
+index 0000000..3fde873
+--- /dev/null
++++ b/vendor/TeleMem/mm_utils/frame_caption.py
+@@ -0,0 +1,617 @@
++import copy
++import functools
++import json
++import multiprocessing as mp
++import os
++from typing import Dict, List, Tuple
++
++from tqdm import tqdm
++
++# import config as config
++from memory_utils import call_openai_model_with_tools, load_config
++from openai import OpenAI
++import openai
++
++# from mm_utils.utils import load_config
++
++PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
++cfg = load_config(os.environ["MM_CONFIG_PATH"])
++
++# --------------------------------------------------------------------------- #
++#                              Prompt templates                               #
++# --------------------------------------------------------------------------- #
++
++messages = [
++    {
++        "role": "system",
++        "content": ""
++    },
++    {
++        "role": "user",
++        "content": "",
++    },
++]
++
++
++CAPTION_PROMPT = """There are consecutive frames from a video. Please understand the video clip with the given transcript then output JSON in the template below.
++
++Transcript of current clip:
++TRANSCRIPT_PLACEHOLDER
++
++Output template:
++{
++  "clip_start_time": CLIP_START_TIME,
++  "clip_end_time": CLIP_END_TIME,
++  "subject_registry": {
++    <subject_i>: {
++      "name": <fill with short identity if name is unknown>,
++      "appearance": <list of appearance descriptions>,
++      "identity": <list of identity descriptions>,
++      "first_seen": <timestamp>
++    },
++    ...
++  },
++  "clip_description": <smooth and detailed natural narration of the video clip>
++}
++"""
++
++
++MERGE_PROMPT = """You are given several partial `new_subject_registry` JSON objects extracted from different clips of the *same* video. They may contain duplicated subjects with slightly different IDs or descriptions.
++
++Task:
++1. Merge these partial registries into one coherent `subject_registry`.
++2. Preserve all unique subjects.
++3. If two subjects obviously refer to the same person, merge them
++   (keep earliest `first_seen` time and union all fields).
++
++Input (list of JSON objects):
++REGISTRIES_PLACEHOLDER
++
++Return *only* the merged `subject_registry` JSON object.
++"""
++
++SYSTEM_PROMPT = "You are a helpful assistant. You must write the output strictly in English. Do not use Chinese or any other language."
++
++# --------------------------------------------------------------------------- #
++#                               Local Client                                  #
++# --------------------------------------------------------------------------- #
++
++# api_config = json.load(open("api_config.json"))
++# client = {}
++
++# for model_name, conf in api_config.items():
++#     # --- Azure OpenAI ---
++#     if "azure_endpoint" in conf and conf["azure_endpoint"]:
++#         client[model_name] = openai.AzureOpenAI(
++#             azure_endpoint=conf["azure_endpoint"],
++#             api_version=conf["api_version"],
++#             api_key=conf["api_key"],
++#         )
++#     # --- OpenAI / local compatible endpoint ---
++#     elif conf.get("base_url"):
++#         client[model_name] = openai.OpenAI(
++#             base_url=conf["base_url"],
++#             api_key=conf["api_key"],
++#         )
++#     else:
++#         print(f"⚠️ {model_name} skipped: no valid endpoint info")
++
++# def get_response(model, messages, timeout=30):
++#     """Get chat completion response from specified model."""
++#     response = client[model].chat.completions.create(
++#         model=model,
++#         messages=messages,
++#         temperature=1e-6,
++#         timeout=timeout,
++#         max_tokens=8192
++#     )
++#     return response.choices[0].message.content, response.usage.total_tokens
++# --------------------------------------------------------------------------- #
++#                               Helper utils                                  #
++# --------------------------------------------------------------------------- #
++def convert_seconds_to_hhmmss(seconds: float) -> str:
++    h = int(seconds // 3600)
++    seconds %= 3600
++    m = int(seconds // 60)
++    s = int(seconds % 60)
++    return f"{h:02}:{m:02}:{s:02}"
++
++
++def gather_frames_from_time_ranges(
++    frame_folder: str, time_ranges: List[Tuple[int, int, str]]
++) -> Dict[str, Dict]:
++    """Return a dict keyed by 't1_t2' -> {files, transcript}."""
++    frame_files = sorted(
++        [f for f in os.listdir(frame_folder) if f.endswith(".jpg")],
++        key=lambda x: float(x.split("_n")[-1].rstrip(".jpg")),
++    )
++    result = {}
++    for t1, t2, text in time_ranges:
++        files = frame_files[t1 : t2 + 1]
++        result[f"{t1}_{t2}"] = {
++            "files": [os.path.join(frame_folder, f) for f in files],
++            "transcript": text or "No transcript.",
++        }
++    return result
++
++def gather_clip_frames(
++    video_frame_folder, clip_secs: int, subtitle_file_path: str = None
++) -> Dict[str, Dict]:
++    # Fix possible typo in the earlier list-comprehension and gather frames again
++    frame_files = sorted(
++        [f for f in os.listdir(video_frame_folder) if f.startswith("frame") and f.endswith(".jpg")],
++        key=lambda x: float(x.split("_n")[-1].rstrip(".jpg")),
++    )
++    if not frame_files:
++        return {}
++
++    # Optional subtitle information
++    subtitle_map = (
++        parse_srt_to_dict(subtitle_file_path) if subtitle_file_path else {}
++    )
++
++    # Map timestamps → file names for quick lookup
++    frame_ts = [float(f.split("_n")[-1].rstrip(".jpg")) / cfg['VIDEO_FPS'] for f in frame_files]
++    ts_to_file = dict(zip(frame_ts, frame_files))
++    last_ts = int(max(frame_ts))
++
++    result = []
++
++    # Iterate over fixed-length clips
++    clip_start = 0
++    while clip_start <= last_ts:
++        clip_end = min(clip_start + clip_secs - 1, last_ts)
++
++        # Collect frames that fall inside the current clip
++        clip_files = [
++            os.path.join(video_frame_folder, ts_to_file[t])
++            for t in frame_ts
++            if clip_start <= t <= clip_end
++        ]
++
++        # Aggregate transcript text overlapping the clip interval
++        transcript_parts: List[str] = []
++        for key, text in subtitle_map.items():
++            s, e = map(int, key.split("_"))
++            if s <= clip_end and e >= clip_start:  # overlap check
++                transcript_parts.append(text)
++        transcript = " ".join(transcript_parts).strip() or "No transcript."
++
++        result.append((
++                f"{clip_start}_{clip_end}", 
++                {"files": clip_files, "transcript": transcript}
++        ))
++
++        clip_start += clip_secs
++    return result
++
++
++# --------------------------------------------------------------------------- #
++#                   Subtitle (.srt) parsing helper function                    #
++# --------------------------------------------------------------------------- #
++def _timestamp_to_seconds(ts: str) -> float:
++    """Convert 'HH:MM:SS,mmm' to seconds (float)."""
++    hh, mm, rest = ts.split(":")
++    ss, ms = rest.split(",")
++    return int(hh) * 3600 + int(mm) * 60 + int(ss) + int(ms) / 1000.0
++
++
++def parse_srt_to_dict(srt_path: str) -> Dict[str, str]:
++    """
++    Parse an .srt file and return a mapping
++    '{startSec_endSec}': 'subtitle text'.
++    """
++    if not os.path.isfile(srt_path):
++        return {}
++
++    result: Dict[str, str] = {}
++    with open(srt_path, "r", encoding="utf-8") as fh:
++        lines = [l.rstrip("\n") for l in fh]
++
++    idx = 0
++    n = len(lines)
++    while idx < n:
++        # Skip sequential index if present
++        if lines[idx].strip().isdigit():
++            idx += 1
++        if idx >= n:
++            break
++
++        # Time-range line
++        if "-->" not in lines[idx]:
++            idx += 1
++            continue
++        start_ts, end_ts = [t.strip() for t in lines[idx].split("-->")]
++        start_sec = int(_timestamp_to_seconds(start_ts))
++        end_sec = int(_timestamp_to_seconds(end_ts))
++        idx += 1
++
++        # Collect subtitle text (may span multiple lines)
++        subtitle_lines: List[str] = []
++        while idx < n and lines[idx].strip():
++            subtitle_lines.append(lines[idx].strip())
++            idx += 1
++        subtitle = " ".join(subtitle_lines)
++        key = f"{start_sec}_{end_sec}"
++        if key in result:  # append if duplicate key
++            result[key] += " " + subtitle
++        else:
++            result[key] = subtitle
++        # Skip blank line separating entries
++        idx += 1
++    return result
++
++
++# --------------------------------------------------------------------------- #
++#                        LLM wrappers (single clip)                           #
++# --------------------------------------------------------------------------- #
++def _caption_clip(task: Tuple[str, Dict], caption_ckpt_folder) -> Tuple[str, dict]:
++    """LLM call for one clip. Returns (timestamp_key, parsed_json)."""
++    timestamp, info = task
++    files, transcript = info["files"], info["transcript"]
++
++    
++    clip_start_time = convert_seconds_to_hhmmss(float(timestamp.split("_")[0]))
++    clip_end_time = convert_seconds_to_hhmmss(float(timestamp.split("_")[1]))
++
++    send_messages = copy.deepcopy(messages)
++    send_messages[0]["content"] = SYSTEM_PROMPT
++    send_messages[1]["content"] = CAPTION_PROMPT.replace(
++        "TRANSCRIPT_PLACEHOLDER", transcript).replace(
++        "CLIP_START_TIME", clip_start_time).replace(
++        "CLIP_END_TIME", clip_end_time)
++    
++
++    
++    if os.path.exists(os.path.join(caption_ckpt_folder, f"{timestamp}.json")):
++        # If the caption already exists, skip processing
++        with open(os.path.join(caption_ckpt_folder, f"{timestamp}.json"), "r") as f:
++            return timestamp, json.load(f)
++
++    tries = 3
++    while tries:
++        tries -= 1
++        resp = call_openai_model_with_tools(
++            send_messages,
++            endpoints=cfg['vlm_client'],
++            model_name=cfg['vlm_model'],
++            return_json=True,
++            use_local=True,
++            image_paths=files,
++            # api_key=cfg['vlm_api_key'],
++        )["content"]
++        # resp, _ = get_response(
++        #     model=cfg['vlm_model'],
++        #     messages=send_messages,
++        #     timeout=30,
++        # )
++        if resp is None:
++            continue
++        try:
++            assert isinstance(resp, str), f"Response must be a JSON string instead of {type(resp)}:{resp}."
++            parsed = json.loads(resp)
++            desc = parsed.get("clip_description")
++            if isinstance(desc, str) and desc.strip():
++                parsed["clip_description"] = desc + f"\n\nTranscript during this video clip: {transcript}."
++            else:
++                
++                parsed["clip_description"] = f"Transcript during this video clip: {transcript}."
++            # parsed["clip_description"] += f"\n\nTranscript during this video clip: {transcript}." # add transcript to description
++            
++
++            resp = json.dumps(parsed)
++            with open(os.path.join(caption_ckpt_folder, f"{timestamp}.json"), "w") as f:
++                f.write(resp)
++            return timestamp, parsed
++        except json.JSONDecodeError:
++            continue
++    return timestamp, {}  # give up
++
++
++# --------------------------------------------------------------------------- #
++#                  LLM wrapper – merge subject registries                     #
++# --------------------------------------------------------------------------- #
++
++
++def merge_subject_registries(registries: List[dict]) -> dict:
++    if not registries:
++        return {}
++
++    BATCH_SIZE = 20
++
++    def _merge_once(batch: List[dict], level: int, idx: int) -> dict:
++        print(
++            f"[INFO] merge_subject_registries: level={level}, batch_idx={idx}, "
++            f"batch_size={len(batch)}",
++            flush=True,
++        )
++
++        send_messages = copy.deepcopy(messages)
++        send_messages[0]["content"] = SYSTEM_PROMPT
++
++        regs_json = json.dumps(batch)
++        MAX_CHARS = 20000
++        if len(regs_json) > MAX_CHARS:
++            regs_json = regs_json[:MAX_CHARS]
++            print("[WARN] merge_subject_registries: batch json truncated", flush=True)
++
++        send_messages[1]["content"] = MERGE_PROMPT.replace(
++            "REGISTRIES_PLACEHOLDER", regs_json
++        )
++
++        tries = 2  
++        while tries:
++            tries -= 1
++            try:
++                resp_obj = call_openai_model_with_tools(
++                    send_messages,
++                    endpoints=cfg['vlm_client'],
++                    model_name=cfg['vlm_model'],
++                    return_json=True,
++                    use_local=True,
++                    max_tokens=1024,
++                    temperature=0.0,
++                )
++            except Exception as e:
++                print(f"[ERROR] merge_once LLM error: {e!r}", flush=True)
++                continue
++
++            resp = resp_obj.get("content")
++            if resp is None:
++                print("[WARN] merge_once got None response", flush=True)
++                continue
++            try:
++                return json.loads(resp)
++            except json.JSONDecodeError as e:
++                print(f"[WARN] merge_once json decode error: {e!r}, resp[:200]={str(resp)[:200]!r}", flush=True)
++                continue
++
++        print("[WARN] merge_once failed after retries, return {}", flush=True)
++        return {}
++
++    # Hierarchical merging
++    current_regs = registries
++    level = 0
++    while len(current_regs) > 1:
++        level += 1
++        print(f"[INFO] merge_subject_registries: start level {level}, num_regs={len(current_regs)}", flush=True)
++        next_round = []
++        for i in range(0, len(current_regs), BATCH_SIZE):
++            batch = current_regs[i:i + BATCH_SIZE]
++            merged = _merge_once(batch, level=level, idx=i // BATCH_SIZE)
++            if merged:
++                next_round.append(merged)
++        if not next_round:
++            print("[WARN] merge_subject_registries: next_round empty, stop merging", flush=True)
++            break
++        current_regs = next_round
++
++    return current_regs[0] if current_regs else {}
++
++
++# --------------------------------------------------------------------------- #
++#                     Process one video (parallel caption)                    #
++# --------------------------------------------------------------------------- #
++def process_video(
++    frame_folder: str,
++    output_caption_folder: str,
++    subtitle_file_path: str = None,
++):
++    caption_ckpt_folder = os.path.join(output_caption_folder, "ckpt")
++    os.makedirs(caption_ckpt_folder, exist_ok=True)
++
++    clips = gather_clip_frames(frame_folder, cfg['CLIP_SECS'], subtitle_file_path)
++
++    caption_clip = functools.partial(
++        _caption_clip,
++        caption_ckpt_folder=caption_ckpt_folder,
++    )
++    # ---------------- Parallel captioning --------------- #
++    with mp.Pool(16) as pool:
++        results = list(
++            tqdm(
++                pool.imap_unordered(caption_clip, clips),
++                total=len(clips),
++                desc=f"Captioning {frame_folder}",
++            )
++        )
++
++    # ---------------- Save per-clip JSON ---------------- #
++    partial_registries = []
++    frame_captions = {}
++    results = sorted(results, key=lambda x: float(x[0].split("_")[0]))
++    for ts, parsed in results:
++        if parsed:
++            frame_captions[ts] = {
++                "caption": parsed["clip_description"],
++            }
++            subject_reg = parsed.get("subject_registry")
++            if subject_reg:
++                partial_registries.append(subject_reg)
++            # partial_registries.append(parsed["subject_registry"])
++
++
++    # ---------------- Merge subject registries ---------- #
++    merged_registry = merge_subject_registries(partial_registries)
++    frame_captions["subject_registry"] = merged_registry
++
++    with open(
++        os.path.join(output_caption_folder, "captions.json"), "w"
++    ) as f:
++        json.dump(frame_captions, f, indent=4)
++
++
++def process_video_lite(
++    output_caption_folder: str,
++    subtitle_file_path: str,
++):
++    """
++    Process video in LITE_MODE using SRT subtitles.
++    """
++    captions = parse_srt_to_dict(subtitle_file_path)
++    frame_captions = {}
++    for key, text in captions.items():
++        frame_captions[key] = {
++            "caption": f"\n\nTranscript during this video clip: {text}.",
++        }
++    frame_captions["subject_registry"] = {}
++    with open(
++        os.path.join(output_caption_folder, "captions.json"), "w"
++    ) as f:
++        json.dump(frame_captions, f, indent=4)
++
++
++def process_all_videos_mme(
++    frames_root: str,
++    captions_root: str,
++    chunk_range=range(1, 21)
++    ):
++    for i in chunk_range:
++        chunk_name = f"videos_chunked_{i:02d}"
++        chunk_frames_dir = os.path.join(frames_root, chunk_name)
++        chunk_captions_dir = os.path.join(captions_root, chunk_name)
++
++        if not os.path.isdir(chunk_frames_dir):
++            print(f"[SKIP] {chunk_name}: frames dir not found -> {chunk_frames_dir}")
++            continue
++
++        os.makedirs(chunk_captions_dir, exist_ok=True)
++
++        # Iterate through each video id directory under this chunk
++        video_ids = [
++            d for d in os.listdir(chunk_frames_dir)
++            if os.path.isdir(os.path.join(chunk_frames_dir, d))
++        ]
++        if not video_ids:
++            print(f"[SKIP] {chunk_name}: no video folders under {chunk_frames_dir}")
++            continue
++
++        print(f"\n=== Processing {chunk_name} ({len(video_ids)} videos) ===")
++
++        for vid in tqdm(video_ids, desc=f"{chunk_name} videos", unit="vid"):
++            frame_folder = os.path.join(chunk_frames_dir, vid, "frames")
++            if not os.path.isdir(frame_folder):
++                # Compatible with cases where frames are directly under the video directory
++                frame_folder = os.path.join(chunk_frames_dir, vid)
++                if not os.path.isdir(frame_folder):
++                    print(f"[SKIP] {chunk_name}/{vid}: no frames folder")
++                    continue
++
++            output_caption_folder = os.path.join(chunk_captions_dir, vid)
++            os.makedirs(output_caption_folder, exist_ok=True)
++            
++            captions_json_path = os.path.join(output_caption_folder, "captions.json")
++
++            # Skip the entire video if captions.json already exists
++            if os.path.isfile(captions_json_path):
++                print(f"[SKIP] {chunk_name}/{vid}: captions.json already exists -> {captions_json_path}")
++                continue
++            
++            # No subtitles passed here; extend as needed if SRT is available
++            try:
++                process_video(
++                    frame_folder=frame_folder,
++                    output_caption_folder=output_caption_folder,
++                    subtitle_file_path=None,
++                )
++            except Exception as e:
++                print(f"[ERROR] {chunk_name}/{vid}: {e!r}")
++
++
++# ...existing code...
++
++def process_all_videos_m3_agent(
++    frames_root: str,
++    captions_root: str,
++):
++    """
++    Batch process all scene videos under m3-agent_dvd/m3-agent_database.
++    Directory structure example:
++        frames_root/
++            bedroom_01/
++                frames/
++                    frame_000001_n0.00.jpg
++                    ...
++            kitchen_01/
++                frames/
++                    ...
++    Output:
++        captions_root/
++            bedroom_01/
++                captions.json
++            kitchen_01/
++                captions.json
++    """
++    if not os.path.isdir(frames_root):
++        print(f"[ERROR] m3-agent frames_root not found -> {frames_root}")
++        return
++
++    os.makedirs(captions_root, exist_ok=True)
++
++    # Iterate through all scene directories
++    scene_ids = [
++        d for d in os.listdir(frames_root)
++        if os.path.isdir(os.path.join(frames_root, d))
++    ]
++    if not scene_ids:
++        print(f"[WARN] no scene folders under {frames_root}")
++        return
++
++    print(f"\n=== Processing m3-agent database ({len(scene_ids)} scenes) ===")
++
++    for sid in tqdm(scene_ids, desc="m3-agent scenes", unit="scene"):
++        scene_dir = os.path.join(frames_root, sid)
++        frame_folder = os.path.join(scene_dir, "frames")
++        if not os.path.isdir(frame_folder):
++            # Compatible with cases where frames are directly under the scene directory
++            frame_folder = scene_dir
++            if not os.path.isdir(frame_folder):
++                print(f"[SKIP] m3-agent/{sid}: no frames folder")
++                continue
++
++        output_caption_folder = os.path.join(captions_root, sid)
++        os.makedirs(output_caption_folder, exist_ok=True)
++
++        captions_json_path = os.path.join(output_caption_folder, "captions.json")
++        # Skip if already exists to avoid regeneration
++        if os.path.isfile(captions_json_path):
++            print(f"[SKIP] m3-agent/{sid}: captions.json already exists -> {captions_json_path}")
++            continue
++
++        try:
++            # m3-agent currently has no subtitles, subtitle_file_path is None
++            process_video(
++                frame_folder=frame_folder,
++                output_caption_folder=output_caption_folder,
++                subtitle_file_path=None,
++            )
++        except Exception as e:
++            print(f"[ERROR] m3-agent/{sid}: {e!r}")
++
++
++# --------------------------------------------------------------------------- #
++#                                    main                                     #
++# --------------------------------------------------------------------------- #
++def main():
++    # Existing Video-MME processing logic
++    frames_root = "../videomme_dvd/videomme_database"
++    captions_root = "../videomme_dvd/captions"
++    subtitle_file_path = "/home/xiaoyizhang/DVD/video_database/raw/i2qSxMVeVLI.srt"
++    process_all_videos_mme(
++        frames_root=frames_root,
++        captions_root=captions_root,
++        chunk_range=range(9, 21),
++    )
++
++    
++    # m3_frames_root = "../m3-agent_dvd/m3-agent_database/robot"
++    # m3_captions_root = "../m3-agent_dvd/captions"
++    # process_all_videos_m3_agent(
++    #     frames_root=m3_frames_root,
++    #     captions_root=m3_captions_root,
++    # )
++
++
++if __name__ == "__main__":
++    main()
+\ No newline at end of file
+diff --git a/vendor/TeleMem/mm_utils/func_call_shema.py b/vendor/TeleMem/mm_utils/func_call_shema.py
+new file mode 100644
+index 0000000..68a256f
+--- /dev/null
++++ b/vendor/TeleMem/mm_utils/func_call_shema.py
+@@ -0,0 +1,119 @@
++# Adapted from https://github.com/peterroelants/annotated-docs
++
++import inspect
++from collections.abc import Callable
++from typing import Any, Final, TypedDict, TypeVar #Required, 
++from typing_extensions import Required
++
++import pydantic
++import pydantic.json_schema
++
++RETURNS_KEY: Final[str] = "returns"
++
++T = TypeVar("T")
++
++
++class FunctionJSONSchema(TypedDict, total=False):
++    name: Required[str]
++    description: str
++    parameters: dict[str, Any]
++
++
++def as_json_schema(func: Callable) -> FunctionJSONSchema:
++    """
++    Return a JSON schema for the given function.
++    """
++    parameters_schema = get_parameters_schema(func)
++    description = ""
++    if func.__doc__:
++        description = inspect.cleandoc(func.__doc__).strip()
++    schema_dct: FunctionJSONSchema = {
++        "name": func.__name__,
++        "description": description,
++        "parameters": parameters_schema,
++    }
++    return schema_dct
++
++
++def doc(description) -> Any:
++    """Annotate a variable with a description."""
++    return pydantic.Field(description=description)
++
++
++def get_parameters_schema(func: Callable) -> dict[str, Any]:
++    """Return a JSON schema for the parameters of the given function."""
++    parameter_model = get_parameter_model(func)
++    return parameter_model.model_json_schema(
++        schema_generator=GenerateJsonSchemaNoTitle,
++        mode="validation",
++    )
++
++
++def get_parameter_model(func: Callable) -> pydantic.BaseModel:
++    """
++    Return a Pydantic model for the parameters of the given function.
++    """
++    field_definitions: dict[str, tuple[Any, Any]] = {}
++    for name, obj in inspect.signature(func).parameters.items():
++        if obj.annotation == inspect.Parameter.empty:
++            raise ValueError(
++                f"`{func.__name__}` parameter `{name!s}` has no annotation, please provide an notation to be able to generate the function specification."
++            )
++        if obj.default == inspect.Parameter.empty:
++            field_definitions[name] = (obj.annotation, pydantic.Field(...))
++        else:
++            field_definitions[name] = (obj.annotation, obj.default)
++    _model_name = ""  # Empty model name
++    return pydantic.create_model(_model_name, **field_definitions)  # type: ignore
++
++
++def get_returns_schema(func: Callable) -> dict[str, Any]:
++    returns_model = get_returns_model(func)
++    return_schema = returns_model.model_json_schema(
++        schema_generator=GenerateJsonSchemaNoTitle,
++        mode="validation",
++    )
++    properties = return_schema.pop("properties")
++    return_schema |= properties[RETURNS_KEY]
++    if "required" in return_schema:
++        del return_schema["required"]
++    if "type" in return_schema and return_schema["type"] == "object":
++        del return_schema["type"]
++    return return_schema
++
++
++def get_returns_model(func: Callable) -> pydantic.BaseModel:
++    """
++    Return a Pydantic model for the returns of the given function.
++    """
++    return_annotation = inspect.signature(func).return_annotation
++    if return_annotation == inspect.Signature.empty:
++        raise ValueError(
++            f"`{func.__name__}` has no return annotation, please provide an annotation to be able to generate the function specification."
++        )
++    field_definitions: dict[str, tuple[Any, Any]] = {
++        RETURNS_KEY: (return_annotation, pydantic.Field(...))
++    }
++    _model_name = ""  # Empty model name
++    return pydantic.create_model(_model_name, **field_definitions)  # type: ignore
++
++
++class GenerateJsonSchemaNoTitle(pydantic.json_schema.GenerateJsonSchema):
++    def generate(
++        self, schema, mode="validation"
++    ) -> pydantic.json_schema.JsonSchemaValue:
++        json_schema = super().generate(schema, mode=mode)
++        if "title" in json_schema:
++            del json_schema["title"]
++        return json_schema
++
++    def get_schema_from_definitions(
++        self, json_ref
++    ) -> pydantic.json_schema.JsonSchemaValue | None:
++        json_schema = super().get_schema_from_definitions(json_ref)
++        if json_schema and "title" in json_schema:
++            del json_schema["title"]
++        return json_schema
++
++    def field_title_should_be_set(self, schema) -> bool:
++        return False
+\ No newline at end of file
+diff --git a/vendor/TeleMem/mm_utils/memory_utils.py b/vendor/TeleMem/mm_utils/memory_utils.py
+new file mode 100644
+index 0000000..d68946b
+--- /dev/null
++++ b/vendor/TeleMem/mm_utils/memory_utils.py
+@@ -0,0 +1,338 @@
++import base64
++import copy
++import json
++import os
++import random
++import time
++from io import BytesIO
++from mimetypes import guess_type
++
++import cv2
++import requests
++from azure.identity import AzureCliCredential
++from pathlib import Path
++import yaml
++
++def load_config(config_path: str):
++    config_path = Path(config_path)
++    if config_path.suffix in {".yaml", ".yml"}:
++        with open(config_path, "r", encoding="utf-8") as f:
++            return yaml.safe_load(f)
++    elif config_path.suffix == ".json":
++        with open(config_path, "r", encoding="utf-8") as f:
++            return json.load(f)
++    else:
++        raise ValueError("Unsupported config file format. Use .yaml, .yml or .json")
++
++
++def retry_with_exponential_backoff(
++    func,
++    initial_delay: float = 1,
++    exponential_base: float = 2,
++    jitter: bool = True,
++    max_retries: int = 8,
++):
++    """Retry a function with exponential backoff."""
++
++    def wrapper(*args, **kwargs):
++        # Initialize variables
++        num_retries = 0
++        delay = initial_delay
++
++        # Loop until a successful response or max_retries is hit or an exception is raised
++        while True:
++            try:
++                return func(*args, **kwargs)
++            # Raise exceptions for any errors not specified
++            except Exception as e:
++                if "rate limit" in str(e).lower() or "timed out" in str(e) \
++                                    or "Too Many Requests" in str(e) or "Forbidden for url" in str(e) \
++                                    or "internal" in str(e).lower():
++                    # Increment retries
++                    num_retries += 1
++
++                    # Check if max retries has been reached
++                    if num_retries > max_retries:
++                        print("Max retries reached. Exiting.")
++                        return None
++
++                    # Increment the delay
++                    delay *= exponential_base * (1 + jitter * random.random())
++                    print(f"Retrying in {delay} seconds for {str(e)}...")
++                    # Sleep for the delay
++                    time.sleep(delay)
++                else:
++                    print(str(e))
++                    return None
++
++    return wrapper
++
++# Function to encode a local image into data URL
++def local_image_to_data_url(image_path):
++    # Guess the MIME type of the image based on the file extension
++    mime_type, _ = guess_type(image_path)
++    if mime_type is None:
++        mime_type = "application/octet-stream"  # Default MIME type if none is found
++
++    image = cv2.imread(image_path)
++    if image is None:
++        raise ValueError(f"Could not read image from path: {image_path}")
++    # Read and encode the image file
++    with open(image_path, "rb") as image_file:
++        base64_encoded_data = base64.b64encode(image_file.read()).decode("utf-8")
++
++    # Construct the data URL
++    return f"data:{mime_type};base64,{base64_encoded_data}"
++
++@retry_with_exponential_backoff
++def call_openai_model_with_tools(  
++    messages,
++    endpoints,
++    model_name,
++    api_key: str = None,
++    use_local: bool = False, 
++    tools: list = [],  # List of tool definitions
++    image_paths: list = [],  
++    max_tokens: int = 4096,  
++    temperature: float = 0.0,  
++    tool_choice: str = "auto",  # Can be "auto", "none", or a specific tool
++    return_json: bool = False,
++) -> dict:  
++    # -------- 1. OpenAI --------
++    if api_key:
++        # print("[DEBUG] call_openai_model_with_tools: using OpenAI cloud")
++        headers = {  
++            "Content-Type": "application/json",  
++            'Authorization': 'Bearer ' + api_key
++        }
++        endpoint = "https://api.openai.com/v1"
++        url = f"{endpoint}/chat/completions"
++    
++    # -------- 2. Local vLLM / OpenAI compatible API --------
++    elif use_local:
++        # print("[DEBUG] call_openai_model_with_tools: using local vLLM")
++        headers = {  
++            "Content-Type": "application/json",
++            # Local models usually don't need authentication, but some frameworks require a placeholder
++            'Authorization': 'Bearer EMPTY'
++        }
++        if isinstance(endpoints, str):
++            endpoint = endpoints
++        elif isinstance(endpoints, list):
++            endpoint = random.choice(endpoints) if endpoints else "http://localhost:8000/v1"
++        else:
++            raise ValueError("Endpoints must be a string or a list of strings.")
++        
++        # Local models use the standard OpenAI compatible path
++        url = f"{endpoint}/chat/completions"
++    
++    # -------- 3. Azure OpenAI (fallback) --------
++    else:
++        # print("[DEBUG] call_openai_model_with_tools: using Azure OpenAI")
++        credential = AzureCliCredential()  
++        token = credential.get_token('https://cognitiveservices.azure.com/')  
++        headers = {  
++            "Content-Type": "application/json",  
++            'Authorization': 'Bearer ' + token.token  
++        }  
++        if isinstance(endpoints, str):
++            endpoint = endpoints
++        elif isinstance(endpoints, list):
++            endpoint = random.choice(endpoints)
++        else:
++            raise ValueError("Endpoints must be a string or a list of strings.")
++        url = f"{endpoint}/openai/deployments/{model_name}/chat/completions?api-version=2025-03-01-preview"
++
++    model = model_name
++
++    payload = {  
++        "model": model,
++        "messages": copy.deepcopy(messages),  
++        "temperature": temperature,
++        # "max_tokens": max_tokens,
++        # "reasoning_effort": reasoning_effort,
++    }
++    
++
++    
++    if return_json:
++        payload["response_format"] = {"type": "json_object"}
++  
++    # Add tools to the payload if provided
++    if tools:
++        payload["tools"] = tools
++        # payload["tool_choice"] = tool_choice
++  
++    if image_paths:
++        # with mp.Pool(processes=min(len(image_paths), mp.cpu_count())) as pool:
++        #     image_data_list = pool.map(local_image_to_data_url, image_paths)
++        # image_data_list = [local_image_to_data_url(image_path) for image_path in image_paths]
++        # payload['messages'].append({"role": "user", "content": []})
++        # for image_data in image_data_list:
++        #     payload['messages'][-1]['content'].append({"type": "image_url", "image_url": {"url": image_data}})
++        payload["messages"].append({"role": "user", "content": []})
++        for image_path in image_paths:
++            # Convert to absolute path and add file:// prefix
++            abs_path = os.path.abspath(image_path)
++            file_url = f"file://{abs_path}"
++            payload["messages"][-1]["content"].append(
++                {
++                    "type": "image_url",
++                    "image_url": {"url": file_url},
++                }
++            )
++            # print(payload["messages"])
++
++    response = requests.post(url, headers=headers, json=payload, timeout=600)  
++  
++    if response.status_code != 200:
++        error_text = response.text
++        raise Exception(f"OpenAI API returned status {response.status_code}: {error_text}")  
++      
++    response_data = response.json()  
++    
++    # Get the message from the response
++    message = response_data['choices'][0]['message']
++    
++    # Check if there's a tool call in the response
++    if "tool_calls" in message:
++        # Return the entire message object when tools are being used
++        return message
++    else:
++        # If there's no tool call, just return the text content
++        return {"content": message['content'].strip(), "tool_calls": None}
++
++class AzureOpenAIEmbeddingService:  
++    @staticmethod  
++    @retry_with_exponential_backoff
++    def get_embeddings(endpoints, model_name, input_text, api_key: str = None, use_local=False):  
++        """  
++        Call Azure OpenAI Embedding service and get embeddings for the input text.  
++  
++        :param api_key: Your Azure OpenAI API key.  
++        :param endpoint: The endpoint URL for the OpenAI service.  
++        :param model: The model name for generating embeddings.  
++        :param input_text: The text for which you want to generate embeddings.  
++        :return: The embeddings as a JSON response.  
++        """  
++        if api_key:
++            headers = {  
++                "Content-Type": "application/json",  
++                'Authorization': 'Bearer ' + api_key
++            }
++            endpoint = "https://api.openai.com/v1"
++            url = f"{endpoint}/embeddings"
++        elif use_local:
++            headers = {  
++                "Content-Type": "application/json",
++                
++                'Authorization': 'Bearer EMPTY'
++            }
++            if isinstance(endpoints, str):
++                endpoint = endpoints
++            elif isinstance(endpoints, list):
++                endpoint = random.choice(endpoints)
++            else:
++                raise ValueError("Endpoints must be a string or a list of strings.")
++            
++            url = f"{endpoint}/embeddings"
++        else:
++            if isinstance(endpoints, str):
++                endpoint = endpoints
++            elif isinstance(endpoints, list):
++                endpoint = random.choice(endpoints)
++            else:
++                raise ValueError("Endpoints must be a string or a list of strings.")  
++            # Define the URL for the embeddings endpoint  
++            url = f"{endpoint}/openai/deployments/{model_name}/embeddings?api-version=2023-05-15"  
++    
++            credential = AzureCliCredential()  
++            token = credential.get_token('https://cognitiveservices.azure.com/')  
++            headers = {  
++                "Content-Type": "application/json",  
++                'Authorization': 'Bearer ' + token.token  
++            }
++        
++        model = model_name
++        # Set up the payload for the request  
++        payload = {  
++            "input": input_text,
++            "model": model
++        }  
++  
++        # Make the request to the Azure OpenAI service  
++        response = requests.post(url, headers=headers, data=json.dumps(payload))  
++  
++        # Check if the request was successful  
++        if response.status_code == 200:  
++            return response.json()['data']
++        else:  
++            response.raise_for_status()
++
++def extract_answer(message: dict) -> str | None:
++    """
++    Extract the plain-text answer from an assistant message that may include
++    tool calls.
++
++    The function first checks the normal `content` field (for responses that
++    are not using tools). If the assistant responded via a tool call, it
++    attempts to parse the JSON string stored in
++    `message["tool_calls"][i]["function"]["arguments"]` and returns the value
++    associated with the key `"answer"`.
++
++    Parameters
++    ----------
++    message : dict
++        The assistant message returned by `call_openai_model_with_tools`.
++
++    Returns
++    -------
++    str | None
++        The extracted answer, or ``None`` if no answer could be found.
++    """
++    # Tool-based response
++    for call in message.get("tool_calls", []):
++        args_json = call["function"]["arguments"]
++        args = json.loads(args_json)
++        if (answer := args.get("answer")):
++            return answer
++
++    # Direct text response
++    if (content := message.get("content")):
++        return content.strip()
++    
++    return None
++
++
++if __name__ == "__main__":
++    # Example for Azure
++    # call_openai_model_with_tools(
++    #     messages=[{"role": "user", "content": "Hello, how are you?"}],
++    #     endpoints=["https://msra-im-openai-eus2.openai.azure.com"],
++    #     model_name="o3",
++    #     tools=[],
++    #     image_paths=[],
++    #     max_tokens=4096,
++    #     temperature=0.0,
++    #     tool_choice="auto",
++    #     return_json=False,
++    # )
++
++    # Example for OpenAI
++    api_key = os.environ.get("OPENAI_API_KEY")
++    if api_key:
++        response = call_openai_model_with_tools(
++            messages=[{"role": "user", "content": "Hello, how are you?"}],
++            endpoints=None, # Not used for OpenAI
++            model_name="gpt-4o",
++            api_key=api_key,
++            tools=[],
++            image_paths=[],
++            max_tokens=4096,
++            temperature=0.0,
++            tool_choice="auto",
++            return_json=False,
++        )
++        print(response)
++    else:
++        print("OPENAI_API_KEY environment variable not set.")
+\ No newline at end of file
+diff --git a/vendor/TeleMem/mm_utils/video_utils.py b/vendor/TeleMem/mm_utils/video_utils.py
+new file mode 100644
+index 0000000..ee417a6
+--- /dev/null
++++ b/vendor/TeleMem/mm_utils/video_utils.py
+@@ -0,0 +1,307 @@
++import os
++import shutil
++from urllib.parse import urlparse
++
++import cv2
++import yt_dlp
++
++# import config as config
++from tqdm import tqdm
++from memory_utils import load_config
++
++PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
++cfg = load_config(os.environ["MM_CONFIG_PATH"])
++
++def _is_youtube_url(url: str) -> bool:
++    """Checks if a URL is a valid YouTube URL."""
++    parsed_url = urlparse(url)
++    return parsed_url.netloc.lower().endswith(('youtube.com', 'youtu.be'))
++
++
++def load_video(
++    video_source: str,
++    with_subtitle: bool = False,
++    subtitle_source: str | None = None,
++) -> str:
++    """
++    Loads a video from YouTube or a local file into the video database.
++    Subtitle support is limited to the SRT format only.
++
++    Args:
++        video_source: YouTube URL or local video file path.
++        with_subtitle: If True, also downloads / copies subtitles (SRT only).
++        subtitle_source: Language code for YouTube subtitles (e.g., 'en', 'auto')
++                         or local *.srt file path when video_source is local.
++
++    Returns:
++        Absolute path to the video file stored in the database.
++
++    Raises:
++        ValueError, FileNotFoundError: On invalid inputs.
++    """
++    raw_video_dir = os.path.join(cfg['VIDEO_DATABASE_FOLDER'], 'raw')
++    os.makedirs(raw_video_dir, exist_ok=True)
++
++    # ------------------- YouTube source -------------------
++    if video_source.startswith(('http://', 'https://')):
++        if not _is_youtube_url(video_source):
++            raise ValueError("Provided URL is not a valid YouTube link.")
++
++        ydl_opts = {
++            'format': (
++                f'bestvideo[height<={cfg["VIDEO_RESOLUTION"]}][ext=mp4]'
++                f'best[height<={cfg["VIDEO_RESOLUTION"]}][ext=mp4]'
++            ),
++            'outtmpl': os.path.join(raw_video_dir, '%(id)s.%(ext)s'),
++            'merge_output_format': 'mp4',
++        }
++        if with_subtitle:
++            ydl_opts.update({
++                'writesubtitles': True,
++                'subtitlesformat': 'srt',
++                'overwritesubtitles': True,
++            })
++
++        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
++            info = ydl.extract_info(video_source, download=True)
++            video_path = ydl.prepare_filename(info)
++
++        # rename subtitle -> "<video_file_name>.srt"
++        if with_subtitle:
++            video_base = os.path.splitext(video_path)[0]
++            for f in os.listdir(raw_video_dir):
++                if f.startswith(info["id"]) and f.endswith(".srt"):
++                    shutil.move(
++                        os.path.join(raw_video_dir, f),
++                        f"{video_base}.srt",
++                    )
++                    break
++
++        return os.path.abspath(video_path)
++
++    # ------------------- Local source -------------------
++    if os.path.exists(video_source):
++        if not os.path.isfile(video_source):
++            raise ValueError(f"Source path '{video_source}' is a directory, not a file.")
++
++        filename = os.path.basename(video_source)
++        destination_path = os.path.join(raw_video_dir, filename)
++        shutil.copy2(video_source, destination_path)
++
++        # copy subtitle file if requested (must be *.srt) and rename
++        if with_subtitle:
++            if not subtitle_source:
++                raise ValueError("subtitle_source must be provided for local videos.")
++            if not subtitle_source.lower().endswith('.srt'):
++                raise ValueError("Only SRT subtitle files are supported for local videos.")
++            if not os.path.isfile(subtitle_source):
++                raise FileNotFoundError(f"Subtitle file '{subtitle_source}' not found.")
++
++            subtitle_destination = os.path.join(
++                raw_video_dir,
++                f"{os.path.splitext(filename)[0]}.srt",
++            )
++            shutil.copy2(subtitle_source, subtitle_destination)
++
++def download_srt_subtitle(video_url: str, output_path: str):
++    """Downloads an SRT subtitle from a YouTube URL."""
++    if not _is_youtube_url(video_url):
++        raise ValueError("Provided URL is not a valid YouTube link.")
++
++    output_dir = os.path.dirname(output_path)
++    os.makedirs(output_dir, exist_ok=True)
++
++    ydl_opts = {
++        'writesubtitles': True,
++        'subtitlesformat': 'srt',
++        'skip_download': True,
++        'writeautomaticsub': True,
++        'outtmpl': os.path.join(output_dir, '%(id)s.%(ext)s'),
++    }
++
++    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
++        info = ydl.extract_info(video_url, download=False)
++        video_id = info['id']
++        ydl.download([video_url])
++
++    # Locate the downloaded subtitle file (yt-dlp names them as <id>.<lang>.srt)
++    downloaded_subtitle_path = None
++    for f in os.listdir(output_dir):
++        if f.startswith(video_id) and f.endswith(".srt"):
++            downloaded_subtitle_path = os.path.join(output_dir, f)
++            break
++
++    if downloaded_subtitle_path:
++        shutil.move(downloaded_subtitle_path, output_path)
++    else:
++        raise FileNotFoundError(f"Could not find SRT subtitle for {video_url}")
++
++
++def decode_video_to_frames(video_path: str, frames_dir: str) -> str:
++    """
++    Decodes a video into JPEG frames at the frame rate specified by cfg['VIDEO_FPS'].
++    Frames are saved in cfg['VIDEO_DATABASE_PATH']/video_names/frames/.
++
++    Args:
++        video_path: The absolute path to the video file.
++
++    Returns:
++        The absolute path to the directory containing the extracted frames.
++
++    Raises:
++        FileNotFoundError: If the video file does not exist.
++        Exception: If frame extraction fails.
++    """
++
++    if not os.path.isfile(video_path):
++        raise FileNotFoundError(f"Video file '{video_path}' does not exist.")
++
++    video_name = os.path.splitext(os.path.basename(video_path))[0]
++    # frames_dir = os.path.join("./videomme_database/videos_chunked_01", video_name, 'frames')
++    os.makedirs(frames_dir, exist_ok=True)
++
++    cap = cv2.VideoCapture(video_path)
++    if not cap.isOpened():
++        raise Exception(f"Failed to open video file '{video_path}'.")
++
++    fps = cap.get(cv2.CAP_PROP_FPS)
++    target_fps = cfg.get('VIDEO_FPS', fps)
++    frame_interval = int(round(fps / target_fps)) if target_fps < fps else 1
++
++    frame_count = 0
++    saved_count = 0
++    while True:
++        ret, frame = cap.read()
++        if not ret:
++            break
++        if frame_count % frame_interval == 0:
++            frame_filename = os.path.join(frames_dir, f"frame_n{saved_count:06d}.jpg")
++            cv2.imwrite(frame_filename, frame)
++            saved_count += 1
++        frame_count += 1
++
++    cap.release()
++    return os.path.abspath(frames_dir)
++
++from concurrent.futures import ThreadPoolExecutor, as_completed
++
++def batch_decode_videos_to_frames(
++    input_dir: str,
++    output_root: str,
++    max_workers: int = 4,
++    ) -> None:
++    """
++    Batch decodes all videos in the input directory to frames.
++
++    Args:
++        input_dir: Directory containing video files.
++        output_root: Root directory to save extracted frames.
++        max_workers: Number of parallel threads for processing.
++    """
++    if not os.path.isdir(input_dir):
++        raise FileNotFoundError(f"Input directory '{input_dir}' does not exist.")
++    
++    os.makedirs(output_root, exist_ok=True)
++
++    video_files = [
++        os.path.join(input_dir, f)
++        for f in os.listdir(input_dir)
++        if f.lower().endswith(".mp4")
++    ]
++    if not video_files:
++        print(f"No .mp4 files found in {input_dir}")
++        return
++    
++    def _worker(video_path: str) -> tuple[str, str | None, Exception | None]:
++        try:
++            video_name = os.path.splitext(os.path.basename(video_path))[0]
++            frames_dir = os.path.join(output_root, video_name, "frames")
++            os.makedirs(frames_dir, exist_ok=True)
++
++            cap = cv2.VideoCapture(video_path)
++            if not cap.isOpened():
++                raise Exception(f"Failed to open video file '{video_path}'.")
++
++            fps = cap.get(cv2.CAP_PROP_FPS)
++            target_fps = cfg.get('VIDEO_FPS', fps)
++            frame_interval = int(round(fps / target_fps)) if target_fps < fps else 1
++
++            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
++            pbar = tqdm(
++                total=total_frames,
++                desc=f"[{video_name}] decoding",
++                unit="f",
++                leave=False,
++            )
++
++            frame_count = 0
++            saved_count = 0
++            while True:
++                ret, frame = cap.read()
++                if not ret:
++                    break
++                if frame_count % frame_interval == 0:
++                    frame_filename = os.path.join(frames_dir, f"frame_n{saved_count:06d}.jpg")
++                    cv2.imwrite(frame_filename, frame, [cv2.IMWRITE_JPEG_QUALITY, 80],)
++                    saved_count += 1
++                frame_count += 1
++                pbar.update(1)
++
++            pbar.close()
++            cap.release()
++            return video_path, frames_dir, None
++        except Exception as e:
++            return video_path, None, e
++    
++    print(f"Found {len(video_files)} videos in {input_dir}. Start decoding with {max_workers} workers...")
++
++
++    with ThreadPoolExecutor(max_workers=max_workers) as executor:
++        futures = {executor.submit(_worker, vp): vp for vp in video_files}
++        for fut in tqdm(as_completed(futures), total=len(futures), desc="Videos", unit="vid"):
++            vp = futures[fut]
++            _, out_dir, err = fut.result()
++            if err is not None:
++                print(f"[ERROR] {vp}: {err}")
++            else:
++                print(f"[OK] {vp} -> {out_dir}")
++
++
++if __name__ == "__main__":
++    # download_srt_subtitle("https://www.youtube.com/watch?v=PQFQ-3d2J-8", "./video_database/PQFQ-3d2J-8/subtitles.srt")
++    
++    
++    input_dir = "../m3-agent/robot/"
++    output_root = "../m3-agent_dvd/videomme_database/robot/"
++    
++    batch_decode_videos_to_frames(
++        input_dir=input_dir,
++        output_root=output_root,
++        max_workers=8,   
++    )
++    print(f"Frames saved to: {output_root}")
++
++    
++    # root_input_base = "../Video-MME/"
++    # root_output_base = "../videomme_dvd/videomme_database/"
++
++    # for i in range(4, 21):
++    #     chunk_name = f"videos_chunked_{i:02d}"
++    #     input_dir = os.path.join(root_input_base, chunk_name, "data")
++    #     output_root = os.path.join(root_output_base, chunk_name)
++
++    #     print(f"\n=== Processing {chunk_name} ===")
++        
++    #     try:
++    #         batch_decode_videos_to_frames(
++    #             input_dir=input_dir,
++    #             output_root=output_root,
++    #             max_workers=8,
++    #         )
++    #     except FileNotFoundError as e:
++    #         print(f"[SKIP] {chunk_name}: {e}")
++    #     except Exception as e:
++    #         print(f"[ERROR] {chunk_name}: {e}")
++    
++    # print("Frames saved Done")
+\ No newline at end of file
+diff --git a/vendor/TeleMem/utils.py b/vendor/TeleMem/utils.py
+new file mode 100644
+index 0000000..eee82ee
+--- /dev/null
++++ b/vendor/TeleMem/utils.py
+@@ -0,0 +1,304 @@
++from typing import Any, Dict, List
++import numpy as np
++import re
++import yaml
++import json
++from pathlib import Path
++
++def load_config(config_path: str):
++    config_path = Path(config_path)
++    if config_path.suffix in {".yaml", ".yml"}:
++        with open(config_path, "r", encoding="utf-8") as f:
++            return yaml.safe_load(f)
++    elif config_path.suffix == ".json":
++        with open(config_path, "r", encoding="utf-8") as f:
++            return json.load(f)
++    else:
++        raise ValueError("Unsupported config file format. Use .yaml, .yml or .json")
++
++def parse_messages(messages):
++    response = ""
++    for msg in messages:
++        if msg["role"] == "system":
++            response += f"system: {msg['content']}\n"
++        if msg["role"] == "user":
++            response += f"user: {msg['content']}\n"
++        if msg["role"] == "assistant":
++            response += f"assistant: {msg['content']}\n"
++    return response
++
++def get_recent_messages_prompt(parsed_messages, context_messages):
++    system_prompt = "你是一个有帮助的助手。"
++    user_prompt = f'''
++在对话区中我会给你一轮对话以及这轮对话之前的若干轮对话，请你用20-100个字总结这轮对话的摘要。
++你的总结要精简一些，能表达清楚意思即可。同时要尽可能覆盖对话中的关键名词、时间、动作等要点。并按照格式区的格式输出。
++需要你总结的对话{{
++{parsed_messages}
++}}
++该轮对话之前的若干轮对话{{
++{context_messages}
++}}
++格式区{{
++这段内容的摘要是：
++[具体摘要内容]
++例如{{
++这段内容的摘要是：
++[小红喜欢吃红富士苹果。小兰不喜欢吃苹果，她更喜欢吃菠萝。他们说果唯伊水果店的水果最好。]
++}}
++}}
++'''.strip()
++    return system_prompt, user_prompt
++
++def get_person_prompt(parsed_messages, context_messages, target_character):
++    system_prompt = "你是一个有帮助的助手。"
++    user_prompt = f'''
++在对话区中，我会提供一轮新的对话以及这轮对话之前的若干轮上下文。
++你的任务是：**聚焦于“{target_character}”这个角色**，从这轮对话中抽取以下四类关键信息：
++
++1.  **人物关系与互动**：他/她与其他角色的关系、情感或具体行为（如：对谁做了什么？谁对他/她怎样？）。
++2.  **情节发展与事件细节**：他/她参与或涉及的具体事件、任务、决定或结果。
++3.  **角色特征与背景**：他/她的性格特点、个人偏好、能力、习惯或身份背景。
++4.  **具体物品与地点**：他/她拥有、使用或出现的特定物品、礼物，以及他/她所在的地点。
++
++请将抽取出的信息，用一个简洁的中文句子总结出来，确保覆盖关键名词、动作和要点。然后，按照“格式区”指定的格式输出。
++
++需要你分析的本轮对话{{
++{parsed_messages}
++}}
++
++该轮对话之前的若干轮上下文{{
++{context_messages}
++}}
++
++目标角色：{target_character}
++
++格式区{{
++这段内容的摘要是：
++[具体摘要内容]
++例如{{
++这段内容的摘要是：
++[肃火向萧炎坦白自己命不久矣，并希望他能离开以保全自己。]
++}}
++}}
++'''.strip()
++    return system_prompt, user_prompt
++
++def extract_events_from_text(text: str) -> List[str]:
++    """
++    适配 BASE_PROMPT 的摘要格式：
++    这段内容的摘要是：
++    [具体摘要内容]
++    支持括号/中文括号，支持摘要出现在同一行或下一行。
++    若未匹配到该格式，则回退到 JSON / 条目 / 触发词分句等抽取逻辑。
++    """
++    def strip_code_fences(s: str) -> str:
++        s = re.sub(r"^```[a-zA-Z0-9_-]*\s*", "", s.strip())
++        s = re.sub(r"\s*```$", "", s.strip())
++        s = re.sub(r"^~~~[a-zA-Z0-9_-]*\s*", "", s.strip())
++        s = re.sub(r"\s*~~~$", "", s.strip())
++        return s
++
++    def cleanup_tail_punct(s: str) -> str:
++        return s.strip().strip("；;，,。.\u3000 ")
++
++    def try_parse_json(s: str) -> List[str]:
++        m = re.search(r"(\{.*\}|\[.*\])", s, flags=re.S)
++        if not m:
++            return []
++        json_chunk = m.group(1)
++        try:
++            obj = json.loads(json_chunk)
++        except Exception:
++            try:
++                fixed = json_chunk.replace("'", "\"")
++                obj = json.loads(fixed)
++            except Exception:
++                return []
++        out = []
++        def pick_text_from_obj(o):
++            for k in ["event", "text", "content", "summary", "事件", "句子"]:
++                if isinstance(o, dict) and k in o and isinstance(o[k], str):
++                    return o[k]
++            if isinstance(o, str):
++                return o
++            return None
++        if isinstance(obj, list):
++            for it in obj:
++                s_it = pick_text_from_obj(it)
++                if s_it:
++                    out.append(cleanup_tail_punct(s_it))
++        elif isinstance(obj, dict):
++            for key in ["events", "data", "结果", "items", "列表"]:
++                if key in obj and isinstance(obj[key], list):
++                    for it in obj[key]:
++                        s_it = pick_text_from_obj(it)
++                        if s_it:
++                            out.append(cleanup_tail_punct(s_it))
++            s_self = pick_text_from_obj(obj)
++            if s_self:
++                out.append(cleanup_tail_punct(s_self))
++        return [x for x in out if x]
++
++    def split_semicolon_blocks(s: str) -> List[str]:
++        parts = re.split(r"[；;\n]", s)
++        trigger_words = [
++            "因为", "由于", "因此", "于是", "从而", "导致", "以致", "结果", "之后", "后来", "随后", "再度", "再次",
++            "提出", "通知", "联系", "同意", "拒绝", "劝", "劝阻", "答应", "承诺", "安慰", "帮助", "报警", "求助",
++            "指责", "控诉", "道歉", "解释", "认为", "确认", "自述", "决定", "申请", "取消", "延期", "复合", "分手",
++            "离婚", "辞职", "解雇", "退还", "拒付", "送医", "住院", "签署", "签约", "转告", "转达", "汇报", "反馈"
++        ]
++        out = []
++        for p in parts:
++            t = cleanup_tail_punct(p)
++            if len(t) >= 4 and any(w in t for w in trigger_words):
++                out.append(t)
++        return out
++
++    def strip_bullet_prefix(line: str):
++        patterns = [
++            r"^\s*\(?\d{1,3}[)\.、:：]\s*",
++            r"^\s*[（(]\d{1,3}[）)]\s*",
++            r"^\s*[①-⑳]\s*",
++            r"^\s*[一二三四五六七八九十百千][、.：:]\s*",
++            r"^\s*事件(?:\d+|[一二三四五六七八九十百千]+)\s*[：:]\s*",
++            r"^\s*[-–—•·\*]\s*",
++        ]
++        for pat in patterns:
++            m = re.match(pat, line)
++            if m:
++                rest = line[m.end():].strip()
++                return True, rest
++        return False, line.strip()
++
++    def remove_example_blocks(s: str) -> str:
++        return re.sub(r"例如\s*[\{【［\[][\s\S]*?[\}】］\]]", "", s)
++
++    def parse_summary_format(s: str) -> List[str]:
++        s = remove_example_blocks(s)
++        marker_pat = re.compile(r"这段内容的摘要是\s*[：:]\s*", flags=re.S)
++        candidates = []
++
++        for m in marker_pat.finditer(s):
++            tail = s[m.end():]
++            br_pat = re.compile(r"[\[\【\［]\s*(.+?)\s*[\]\】\］]", flags=re.S)
++            br_m = br_pat.search(tail)
++            if br_m:
++                cand = cleanup_tail_punct(br_m.group(1))
++                if 8 <= len(cand) <= 400:
++                    candidates.append(cand)
++                    continue
++            lines = [ln.strip() for ln in tail.splitlines()]
++            for ln in lines:
++                if not ln:
++                    continue
++                if ln.startswith("例如"):
++                    break
++                cand = cleanup_tail_punct(ln)
++                if 6 <= len(cand) <= 400:
++                    candidates.append(cand)
++                break
++
++        if candidates:
++            seen = set()
++            uniq = []
++            for c in candidates:
++                if c and c not in seen:
++                    seen.add(c)
++                    uniq.append(c)
++            best = max(uniq, key=len)
++            return [best]
++        return []
++
++    text = strip_code_fences(text)
++    summaries = parse_summary_format(text)
++    if summaries:
++        return summaries
++
++    events = try_parse_json(text)
++    if events:
++        seen = set()
++        uniq = []
++        for e in events:
++            e = cleanup_tail_punct(e)
++            if e and e not in seen:
++                seen.add(e)
++                uniq.append(e)
++        return uniq
++
++    lines = [l.rstrip() for l in text.splitlines()]
++    items, cur = [], None
++
++    for raw in lines:
++        line = raw.strip()
++        if not line:
++            continue
++        if any(x in line for x in ["输出格式", "你需要处理的对话如下", "仅供参考", "请根据", "严格遵循"]):
++            continue
++        is_bul, rest = strip_bullet_prefix(line)
++        if is_bul:
++            if cur:
++                items.append(cleanup_tail_punct(cur))
++            cur = rest
++        else:
++            if cur is not None:
++                if line:
++                    sep = " " if (cur and not cur.endswith(("，", ",", "（", "(", "：", ":"))) else ""
++                    cur = f"{cur}{sep}{line}"
++            else:
++                if re.match(r"^\s*事件[：:]", line):
++                    cur = re.sub(r"^\s*事件[：:]\s*", "", line).strip()
++                else:
++                    continue
++    if cur:
++        items.append(cleanup_tail_punct(cur))
++    if not items:
++        items = split_semicolon_blocks(text)
++
++    out, seen = [], set()
++    for it in items:
++        it = cleanup_tail_punct(it)
++        if it and it not in seen:
++            seen.add(it)
++            out.append(it)
++    return out
++
++def merge_consecutive_messages(messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
++    """
++    将连续的相同角色消息合并为一条消息。
++    例如: [{"role": "user", "content": "A"}, {"role": "user", "content": "B"}]
++    合并为: [{"role": "user", "content": "A\nB"}]
++    """
++    if not messages:
++        return []
++
++    merged = []
++    current_role = messages[0]["role"]
++    current_content = messages[0]["content"]
++
++    for i in range(1, len(messages)):
++        msg = messages[i]
++        if msg["role"] == current_role:
++            # 合并相同角色的消息
++            current_content += "\n" + msg["content"]
++        else:
++            # 角色不同，保存当前合并的消息，并开始新的合并
++            merged.append({"role": current_role, "content": current_content})
++            current_role = msg["role"]
++            current_content = msg["content"]
++
++    # 添加最后一组消息
++    merged.append({"role": current_role, "content": current_content})
++    return merged
++
++def _cosine_similarity(a, b):
++    if a.shape != b.shape:
++        raise ValueError(f"Vector dimensions mismatch: {a.shape} vs {b.shape}")
++
++    norm_a = np.linalg.norm(a)
++    norm_b = np.linalg.norm(b)
++
++    if norm_a < 1e-9 or norm_b < 1e-9:
++        return 0.0
++
++    similarity = np.dot(a, b) / (norm_a * norm_b)
++    return float(np.clip(similarity, -1.0, 1.0))
+\ No newline at end of file

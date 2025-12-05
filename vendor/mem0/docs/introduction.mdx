@@ -1,0 +1,71 @@
+---
+title: "Welcome to Mem0"
+description: "Memory layer for AI agents"
+mode: "custom"
+---
+
+{/* debug: welcome-layout-v2 */}
+
+<div className="px-4 pt-16 pb-12 lg:pt-20 max-w-4xl mx-auto text-center space-y-4">
+  <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-zinc-50 tracking-tight mb-3">
+    Build with <span className="text-primary">mem0</span>
+  </h1>
+
+<p className="max-w-2xl mx-auto text-base text-gray-600 dark:text-zinc-400 leading-relaxed">
+  Universal, Self-improving memory layer for LLM applications.
+</p>
+
+  <a
+    href="/platform/quickstart"
+    className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-zinc-500 hover:text-primary dark:hover:text-primary transition-colors"
+  >
+    Write your first memory
+    <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+  </a>
+</div>
+
+<section className="px-4 max-w-6xl mx-auto space-y-4">
+  <div className="text-center">
+    <h2 className="text-xl font-semibold text-gray-900 dark:text-zinc-100">
+      Mem0 Products
+    </h2>
+  </div>
+
+  <CardGroup cols={3}>
+    <Card title="Mem0 Platform" icon="rocket" href="/platform/overview">
+      Managed memory with production-scale infrastructure, ready in minutes.
+    </Card>
+
+    <Card title="Mem0 Open Source" icon="code-branch" href="/open-source/overview">
+      Self-host the Mem0 stack for full control over data, deployment, and customization.
+    </Card>
+
+    <Card title="OpenMemory" icon="brain" href="/openmemory/overview">
+      Workspace-based memory for teams collaborating across agents and projects.
+    </Card>
+
+  </CardGroup>
+</section>
+
+<section className="px-4 pt-12 pb-20 max-w-6xl mx-auto space-y-4">
+  <div className="text-center">
+    <h2 className="text-xl font-semibold text-gray-900 dark:text-zinc-100">
+      Developer Resources
+    </h2>
+  </div>
+
+  <CardGroup cols={3}>
+    <Card title="Cookbooks" icon="book-open" href="/examples">
+      Production-ready tutorials that show how to ship memorable AI experiences.
+    </Card>
+
+    <Card title="Integrations" icon="plug" href="/integrations">
+      Connect Mem0 to LangChain, CrewAI, Vercel AI SDK, and 20+ partner frameworks.
+    </Card>
+
+    <Card title="API reference" icon="terminal" href="/api-reference">
+      Explore every REST endpoint with payload examples and usage guidance.
+    </Card>
+
+  </CardGroup>
+</section>
