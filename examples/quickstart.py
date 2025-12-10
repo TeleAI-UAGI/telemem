@@ -3,7 +3,7 @@ from vendor.TeleMem.TeleMemory import TeleMemory
 from vendor.TeleMem.utils import load_config
 
 # Load configuration and initialize memory system
-config = load_config("vendor/TeleMem/config.yaml")
+config = load_config("data/config.yaml")
 memory = TeleMemory.from_config(config)
 
 # Simulate multi-turn dialogue data
