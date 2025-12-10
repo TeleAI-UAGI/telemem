@@ -1,0 +1,69 @@
+# config.yaml
+llm:
+  provider: openai
+  config:
+    model: qwen3-8b
+    openai_base_url: http://localhost:4000/v1
+    api_key: sk-xxx
+
+embedder:
+  provider: openai
+  config:
+    model: qwen3-8b-embedding
+    openai_base_url: http://localhost:4000/v1
+    api_key: sk-xxx
+
+vector_store:
+  provider: faiss
+  config:
+    collection_name: telemem
+    path: db/faiss_db
+
+history_db_path: db/history.db
+
+buffer_size: 64
+similarity_threshold: 0.95
+faiss_dir: "./faiss_db"
+
+llm_client: "http://localhost:4000/v1"
+llm_model: "qwen3-8b"
+llm_api_key: "EMPTY"
+
+emb_client: "http://localhost:4000/v1"
+emb_model: "qwen3-8b-embedding"
+emb_api_key: "EMPTY"
+emb_dim: 4096
+
+vlm_client: "http://localhost:4000/v1"
+vlm_model: "qwen3-omni"
+vlm_api_key: "EMPTY"
+
+
+# ================ mm_utils multi modal setting ================
+# video download and segmentation
+VIDEO_DATABASE_FOLDER: "./videomme_database/"
+VIDEO_RESOLUTION: "360"
+VIDEO_FPS: 2
+CLIP_SECS: 10
+
+# model configuration
+OPENAI_API_KEY: null
+
+# Azure OpenAI
+AOAI_CAPTION_VLM_ENDPOINT_LIST: []
+AOAI_CAPTION_VLM_MODEL_NAME: "gpt-4.1-mini"
+AOAI_ORCHESTRATOR_LLM_ENDPOINT_LIST: []
+AOAI_ORCHESTRATOR_LLM_MODEL_NAME: "o3"
+AOAI_TOOL_VLM_ENDPOINT_LIST: []
+AOAI_TOOL_VLM_MODEL_NAME: "gpt-4.1-mini"
+AOAI_TOOL_VLM_MAX_FRAME_NUM: 50
+AOAI_EMBEDDING_RESOURCE_LIST: []
+AOAI_EMBEDDING_LARGE_MODEL_NAME: "text-embedding-3-large"
+AOAI_EMBEDDING_LARGE_DIM: 3072
+
+# agent and tool setting
+LITE_MODE: true
+GLOBAL_BROWSE_TOPK: 300
+OVERWRITE_CLIP_SEARCH_TOPK: 0
+SINGLE_CHOICE_QA: true
+MAX_ITERATIONS: 3
