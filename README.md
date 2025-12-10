@@ -571,5 +571,8 @@ Made with ❤️ by the Ubiquitous AGI team at TeleAI.
 </div>
 
 <div align="center" style="margin-top: 10px;">
-    <img src="https://github.com/TeleAI-UAGI/TeleEgo/blob/main/assets/TeleAI.jpg" alt="TeleAI Logo" width="120px" />
+  <img src="assets/TeleAI.jpg" alt="TeleAI Logo" height="120px" />
+  &nbsp;&nbsp;&nbsp;
+  <img src="assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
 </div>
+
