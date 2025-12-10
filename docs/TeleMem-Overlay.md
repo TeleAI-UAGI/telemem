@@ -13,21 +13,32 @@
 
 ```
 telemem/
+├── assets/                 # Documentation assets and figures
 ├── vendor/
-│ └── mem0/                # Upstream repository source code
+│ └── mem0/                 # Upstream repository source code
 ├── overlay/
-│ └── patches/             # TeleMem custom patch files (.patch)
-├── scripts/               # Overlay management scripts
-│ ├── init_upstream.sh     # Initialize upstream subtree
-│ ├── update_upstream.sh   # Sync upstream and reapply patches
-│ ├── record_patch.sh      # Record local modifications as patches
-│ └── apply_patches.sh     # Apply patches
-├── PATCHES.md             # Patch list and descriptions
-├── TeleMem-Overlay.md     # Overlay development documentation (English)
-├── TeleMem-Overlay-ZH.md  # Overlay development documentation (Chinese)
-├── README.md              # README in English
-├── README-ZN.md           # README in Chinese
-└── quickstart.py          # Quick start example
+│ └── patches/              # TeleMem custom patch files (.patch)
+├── scripts/                # Overlay management scripts
+│ ├── init_upstream.sh      # Initialize upstream subtree
+│ ├── update_upstream.sh    # Sync upstream and reapply patches
+│ ├── record_patch.sh       # Record local modifications as patches
+│ └── apply_patches.sh      # Apply patches
+├── baselines/              # Baseline implementations for comparative evaluation
+│ ├── RAG                   # Retrieval-Augmented Generation baseline
+│ ├── MemoBase              # MemoBase memory management system
+│ ├── MOOM                  # MOOM dual-branch narrative memory framework
+│ ├── A-mem                 # A-mem agent memory baseline
+│ └── Mem0                  # Mem0 baseline implementation
+├── data/                   # Small sample datasets for evaluation or demonstration
+├── examples/               # Code examples and tutorial demos
+│ ├── quickstart.py         # Quick start
+│ └── quickstart_mm.py      # Quick start(Multimodel)
+├── docs/
+│ ├── TeleMem-Overlay.md    # Overlay development guide (English)
+│ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
+│ └── README-ZH.md          # Chinese README
+├── PATCHES.md              # Patch list and descriptions
+└── README.md               # This file
 ```
 
 ---
