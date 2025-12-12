@@ -70,6 +70,7 @@ telemem/
 │ ├── MOOM                  # MOOM dual-branch narrative memory framework
 │ ├── A-mem                 # A-mem agent memory baseline
 │ └── Mem0                  # Mem0 baseline implementation
+├── config/                 # TeleMem configuration
 ├── data/                   # Small sample datasets for evaluation or demonstration
 ├── examples/               # Code examples and tutorial demos
 │ ├── quickstart.py         # Quick start
