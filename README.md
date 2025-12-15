@@ -50,7 +50,7 @@ telemem/
 
 ## 🔥 Research Highlights
 
-* **Significantly improved memory accuracy**: Achieved **86.33%** accuracy on the ZH-4O Chinese long-character-dialogue benchmark, **19% higher** than Mem0.
+* **Significantly improved memory accuracy**: Achieved **86.33%** accuracy on the ZH-4O Chinese multi-character long-dialogue benchmark, **19% higher** than Mem0.
 
 * **Doubled speed performance**: Millisecond-level semantic retrieval enabled by efficient buffering and batch writing.
 
