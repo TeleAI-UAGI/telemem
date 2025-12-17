@@ -144,7 +144,7 @@ TeleMem enables conversational AI to maintain stable, natural, and continuous wo
 * Multimodal agent memory management
 * Long video understanding and information retrieval
   
-  ![image](assets/overview.png)
+  ![image](assets/text-writing.png)
 
 ---
 
@@ -157,7 +157,7 @@ TeleMem deeply refactors Mem0 to address **characterization**, **long-term memor
 | Multi-character separation | ❌ Not supported             | ✅ Automatically creates **independent memory profiles** per character |
 | Summary quality            | Basic summarization         | ✅ **Context-aware + character-focused prompts** covering key entities, actions, and timestamps |
 | Deduplication mechanism    | Vector similarity filtering | ✅ **LLM-based semantic clustering**: merges similar memories via LLM |
-| Write performance          | Streaming, single writes    | ✅ **Buffer + batch flush + concurrency**: 2–3× faster writes |
+| Write performance          | Streaming, single writes    | ✅ **Batch flush + concurrency**: 2–3× faster writes |
 | Storage format             | SQLite / vector DB          | ✅ **FAISS + JSON metadata dual-write**: fast retrieval + human-readable |
 | Multimodal Capability | Single image to text only | ✅ **Video Multimodal Memory**: Full video processing pipeline + ReAct multi-step reasoning QA |
 ---
@@ -588,6 +588,7 @@ video/
 [Apache 2.0 License](LICENSE)
 
 ---
+
 ## Acknowledgements
 
 TeleMem’s development has been deeply inspired by open-source communities and cutting-edge research. We extend our sincere gratitude to the following projects and teams:
@@ -599,6 +600,15 @@ TeleMem’s development has been deeply inspired by open-source communities and 
 - [**Memento**](https://github.com/Agent-on-the-Fly/Memento)
   
 ------
+
+
+
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=TeleAI-UAGI/telemem&type=date&legend=top-left)](https://www.star-history.com/#TeleAI-UAGI/telemem&type=date&legend=top-left)
+
+---
 
 <div align="center">
 
@@ -613,4 +623,7 @@ Made with ❤️ by the Ubiquitous AGI team at TeleAI.
   &nbsp;&nbsp;&nbsp;
   <img src="assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
 </div>
+
+
+
 
