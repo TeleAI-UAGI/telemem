@@ -1,0 +1,75 @@
+llm_api_key: XXX
+llm_base_url: https://api.openai.com/v1/
+best_llm_model: gpt-4o
+
+overwrite_user_profiles:
+  - topic: "basic_info"
+    sub_topics:
+      - name: "name"
+      - name: "age"
+      - name: "gender"
+      - name: "grade_level"
+        description: "current academic grade or level"
+      - name: "school_type"
+        description: "public, private, homeschool, university etc."
+      - name: "location"
+      - name: "primary_language"
+      - name: "learning_languages"
+        description: "languages being studied"
+
+  - topic: "academic_profile"
+    sub_topics:
+      - name: "major_subjects"
+        description: "main subjects being studied"
+      - name: "weak_subjects"
+        description: "subjects needing improvement"
+      - name: "strong_subjects"
+        description: "subjects with good performance"
+      - name: "study_hours"
+        description: "average daily study time"
+      - name: "academic_goals"
+        description: "target grades or learning objectives"
+      - name: "exam_schedule"
+        description: "upcoming test dates and deadlines"
+
+  - topic: "learning_preferences"
+    sub_topics:
+      - name: "learn_style"
+        description: "visual, auditory, reading, kinesthetic"
+      - name: "study_mode"
+        description: "solo, group, tutor-led, mixed"
+      - name: "content_format"
+        description: "video, text, interactive, practice tests"
+      - name: "session_length"
+        description: "preferred duration of study sessions"
+      - name: "difficulty_pref"
+        description: "preferred challenge level of content"
+      - name: "review_frequency"
+        description: "how often to review learned material"
+
+  - topic: "progress_tracking"
+    sub_topics:
+      - name: "completed_courses"
+      - name: "current_courses"
+      - name: "course_progress"
+        description: "percentage completion of active courses"
+      - name: "test_scores"
+      - name: "practice_stats"
+        description: "practice exercise completion rates"
+      - name: "study_streaks"
+        description: "consecutive days of learning"
+
+  - topic: "engagement_metrics"
+    sub_topics:
+      - name: "active_time"
+        description: "time spent actively learning"
+      - name: "completion_rate"
+        description: "percentage of started courses finished"
+      - name: "interaction_freq"
+        description: "frequency of app usage"
+      - name: "preferred_times"
+        description: "most active study hours"
+      - name: "reward_points"
+        description: "accumulated achievement points"
+      - name: "social_learning"
+        description: "participation in group activities"

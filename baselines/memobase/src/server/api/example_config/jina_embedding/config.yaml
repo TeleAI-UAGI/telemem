@@ -1,0 +1,10 @@
+llm_api_key: XXX
+llm_base_url: https://api.openai.com/v1/
+best_llm_model: gpt-4o
+
+embedding_provider: jina
+embedding_api_key: jina_XXXX
+embedding_model: jina-embeddings-v3
+embedding_dim: 1024
+
+language: en
