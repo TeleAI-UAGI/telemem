@@ -13,21 +13,32 @@
 
 ```
 telemem/
+├── assets/                   # 文档资源与插图素材
 ├── vendor/
-│   └── mem0/                   # 上游仓库源代码（通过 git subtree 引入）
+│   └── mem0/                 # 上游 Mem0 仓库源代码（通过 git subtree 引入）
 ├── overlay/
-│   └── patches/                # TeleMem 自定义补丁文件 (.patch)
-├── scripts/                    # Overlay 管理脚本
-│   ├── init_upstream.sh        # 初始化上游 subtree
-│   ├── update_upstream.sh      # 同步上游并重新打补丁
-│   ├── record_patch.sh         # 记录本地修改为补丁
-│   └── apply_patches.sh        # 应用补丁
-├── PATCHES.md                  # 补丁列表及说明
-├── TeleMem-Overlay.md          # Overlay 开发说明（英文）
-├── TeleMem-Overlay-ZH.md       # Overlay 开发说明（中文）
-├── README.md                   # 英文版 README
-├── README-ZH.md                # 中文版 README
-└── quickstart.py               # 快速开始
+│   └── patches/              # TeleMem 自定义补丁文件（.patch），用于扩展与修改上游代码
+├── scripts/                  # Overlay 管理与自动化脚本
+│   ├── init_upstream.sh      # 初始化上游 subtree 仓库
+│   ├── update_upstream.sh    # 同步上游更新并重新应用 TeleMem 补丁
+│   ├── record_patch.sh       # 将本地代码修改记录为可复现的补丁文件
+│   └── apply_patches.sh      # 应用补丁构建 TeleMem 完整代码
+├── baselines/                # 对比评测使用的基线方法实现
+│   ├── RAG                   # Retrieval-Augmented Generation（检索增强生成）基线
+│   ├── MemoBase              # MemoBase 记忆管理系统
+│   ├── MOOM                  # MOOM 双分支叙事记忆框架
+│   ├── A-mem                 # A-mem 智能体记忆系统基线
+│   └── Mem0                  # Mem0 基线实现
+├── data/                     # 用于评测或演示的小规模示例数据集
+├── examples/                 # 示例代码与教程 Demo
+│   ├── quickstart.py         # 快速入门示例（文本记忆）
+│   └── quickstart_mm.py      # 快速入门示例（多模态记忆）
+├── docs/                     # 项目文档、教程与开发者指南
+│   ├── TeleMem-Overlay.md    # Overlay 开发指南（英文版）
+│   ├── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
+│   └── README-ZH.md          # 项目中文说明文档
+├── PATCHES.md                # TeleMem 补丁列表及功能说明
+└── README.md                 # 项目英文总说明文档（本文件）
 ```
 
 ---

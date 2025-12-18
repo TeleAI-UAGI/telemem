@@ -1,7 +1,7 @@
 # Run the experiments on ZH-4O Chinese dataset:
 ```bash
 python test_advanced.py \
-    --dataset data/ZH-4O_locomo_format.json \
+    --dataset ../../data/zh4o/data.json \
     --model qwen3-8b \
     --backend openai \
     --retrieve_k 10 \

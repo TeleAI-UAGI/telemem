@@ -3,11 +3,11 @@ from vendor.TeleMem.utils import load_config
 import os
 
 # Initialize
-config = load_config("vendor/TeleMem/config.yaml")
+config = load_config("config/config.yaml")
 memory = TeleMemory.from_config(config)
 
 # Define paths
-video_path = "video/3EQLFHRHpag.mp4"
+video_path = "data/samples/video/3EQLFHRHpag.mp4"
 video_name = os.path.splitext(os.path.basename(video_path))[0]
 
 # Step 1: Add video to memory (auto-processing)

@@ -1,20 +1,24 @@
-<div align="center">
-  <h1>TeleMem</h1>
-  <p>
-      <a href="README.md">English</a> | <a href="README-ZH.md">简体中文</a>
-  </p>
-  <p>
-      <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory"> Awesome-Agent-Memory →</strong></a>
-  </p>
-</div>
+<p align="center">
+  <a href="https://github.com/TeleAI-UAGI/telemem">
+    <img src="./assets/TeleMem.png" width="40%" />
+  </a>
+</p>
 
-TeleMem is an advanced memory management system **fully compatible with Mem0**, deeply optimized for complex scenarios involving **multi-turn dialogues**, **character modeling**, **long-term information storage**, and **semantic retrieval**.
+<h1 align="center"> TeleMem: Building Long-Term and Multimodal Memory for Agentic AI </h1>
 
-Through its unique **context-aware enhancement mechanism**, TeleMem provides conversational AI with core infrastructure offering **higher accuracy**, **faster performance**, and **stronger character memory capabilities**.
-
-Building upon this foundation, TeleMem implements **video understanding, multimodal reasoning, and visual question answering** capabilities. Through a complete pipeline of video frame extraction, caption generation, and vector database construction, AI Agents can effortlessly **store, retrieve, and reason over video content** just like handling text memories.
-
-📘 Overlay Mode Development Documentation: [TeleMem-Overlay.md](TeleMem-Overlay.md)
+<p align="center">
+  <a href="https://www.arxiv.org/pdf/2510.23981">
+    <img src="https://img.shields.io/badge/arXiv-Paper-red" alt="arXiv">
+  </a>
+  <a href="https://github.com/TeleAI-UAGI/telemem">
+    <img src="https://img.shields.io/github/stars/TeleAI-UAGI/TeleMem?style=social" alt="GitHub Stars">
+  </a>
+  <a href="https://github.com/TeleAI-UAGI/TeleMem/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-Apache%20License%202.0-blue" alt="License: Apache 2.0">
+  </a>
+  <img src="https://img.shields.io/github/last-commit/TeleAI-UAGI/TeleMem?color=blue" alt="Last Commit">
+  <img src="https://img.shields.io/badge/PRs-Welcome-red" alt="PRs Welcome">
+</p>
 
 <div align="left">
 
@@ -24,26 +28,60 @@ Building upon this foundation, TeleMem implements **video understanding, multimo
 
 ---
 
+
+<div align="center">
+  <p>
+      <a href="README.md">English</a> | <a href="docs/README-ZH.md">简体中文</a>
+  </p>
+  <p>
+      <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory"> <strong>📄 Awesome-Agent-Memory →</strong></a>
+  </p>
+</div>
+
+TeleMem is an advanced memory management system **fully compatible with Mem0**, deeply optimized for complex scenarios involving **multi-turn dialogues**, **character modeling**, **long-term information storage**, and **semantic retrieval**.
+
+Through its unique **context-aware enhancement mechanism**, TeleMem provides conversational AI with core infrastructure offering **higher accuracy**, **faster performance**, and **stronger character memory capabilities**.
+
+Building upon this foundation, TeleMem implements **video understanding, multimodal reasoning, and visual question answering** capabilities. Through a complete pipeline of video frame extraction, caption generation, and vector database construction, AI Agents can effortlessly **store, retrieve, and reason over video content** just like handling text memories.
+
+📘 Overlay Mode Development Documentation: [docs/TeleMem-Overlay.md](TeleMem-Overlay.md)
+
+
+
+---
+
 ## 📦 Project Structure
 
 ```
 telemem/
+├── assets/                 # Documentation assets and figures
 ├── vendor/
-│ └── mem0/                # Upstream repository source code
+│ └── mem0/                 # Upstream repository source code
 ├── overlay/
-│ └── patches/             # TeleMem custom patch files (.patch)
-├── scripts/               # Overlay management scripts
-│ ├── init_upstream.sh     # Initialize upstream subtree
-│ ├── update_upstream.sh   # Sync upstream and reapply patches
-│ ├── record_patch.sh      # Record local modifications as patches
-│ └── apply_patches.sh     # Apply patches
-├── PATCHES.md             # Patch list and descriptions
-├── TeleMem-Overlay.md     # Overlay development guide (English)
-├── TeleMem-Overlay-ZH.md  # Overlay development guide (Chinese)
-├── README.md              # This file
-├── README-ZH.md           # Chinese README
-├── quickstart.py          # Quick start
-└── quickstart_mm.py       # Quick start(Multimodel)
+│ └── patches/              # TeleMem custom patch files (.patch)
+├── scripts/                # Overlay management scripts
+│ ├── init_upstream.sh      # Initialize upstream subtree
+│ ├── update_upstream.sh    # Sync upstream and reapply patches
+│ ├── record_patch.sh       # Record local modifications as patches
+│ └── apply_patches.sh      # Apply patches
+├── baselines/              # Baseline implementations for comparative evaluation
+│ ├── RAG                   # Retrieval-Augmented Generation baseline
+│ ├── MemoBase              # MemoBase memory management system
+│ ├── MOOM                  # MOOM dual-branch narrative memory framework
+│ ├── A-mem                 # A-mem agent memory baseline
+│ └── Mem0                  # Mem0 baseline implementation
+├── config/               
+| └── config.yaml           # TeleMem configuration
+├── data/                   # Small sample datasets for evaluation or demonstration
+├── examples/               # Code examples and tutorial demos
+│ ├── quickstart.py         # Quick start
+│ └── quickstart_mm.py      # Quick start(Multimodel)
+├── docs/
+│ ├── TeleMem-Overlay.md    # Overlay development guide (English)
+│ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
+│ └── README-ZH.md          # Chinese README
+├── PATCHES.md              # Patch list and descriptions
+└── README.md               # This file
 ```
 
 ---
@@ -106,7 +144,7 @@ TeleMem enables conversational AI to maintain stable, natural, and continuous wo
 * Multimodal agent memory management
 * Long video understanding and information retrieval
   
-  ![image](assets/overview.png)
+  ![image](assets/text-writing.png)
 
 ---
 
@@ -119,7 +157,7 @@ TeleMem deeply refactors Mem0 to address **characterization**, **long-term memor
 | Multi-character separation | ❌ Not supported             | ✅ Automatically creates **independent memory profiles** per character |
 | Summary quality            | Basic summarization         | ✅ **Context-aware + character-focused prompts** covering key entities, actions, and timestamps |
 | Deduplication mechanism    | Vector similarity filtering | ✅ **LLM-based semantic clustering**: merges similar memories via LLM |
-| Write performance          | Streaming, single writes    | ✅ **Buffer + batch flush + concurrency**: 2–3× faster writes |
+| Write performance          | Streaming, single writes    | ✅ **Batch flush + concurrency**: 2–3× faster writes |
 | Storage format             | SQLite / vector DB          | ✅ **FAISS + JSON metadata dual-write**: fast retrieval + human-readable |
 | Multimodal Capability | Single image to text only | ✅ **Video Multimodal Memory**: Full video processing pipeline + ReAct multi-step reasoning QA |
 ---
@@ -196,12 +234,12 @@ vim vendor/TeleMem/config.yaml
 ### Example
 
 ```python
-# quickstart.py
+# python examples/quickstart.py
 from vendor.TeleMem.TeleMemory import TeleMemory
 from vendor.TeleMem.utils import load_config
 
 # Load configuration and initialize memory system
-config = load_config("vendor/TeleMem/config.yaml")
+config = load_config("config/config.yaml")
 memory = TeleMemory.from_config(config)
 
 # Simulate multi-turn dialogue data
@@ -407,7 +445,7 @@ def search_mm(
 Run the multimodal demo:
 
 ```bash
-python quickstart_mm.py
+python examples/quickstart_mm.py
 ```
 
 Complete code example:
@@ -418,15 +456,15 @@ from vendor.TeleMem.utils import load_config
 import os
 
 # Initialize
-config = load_config("vendor/TeleMem/config.yaml")
+config = load_config("config/config.yaml")
 memory = TeleMemory.from_config(config)
 
 # Define paths
-video_path = "video/3EQLFHRHpag.mp4"
+video_path = "data/samples/video/3EQLFHRHpag.mp4"
 video_name = os.path.splitext(os.path.basename(video_path))[0]
 
 # Step 1: Add video to memory (auto-processing)
-if not os.path.exists(f"video/vdb/{video_name}/{video_name}_vdb.json"):
+if not os.path.exists(f"data/samples/video/vdb/{video_name}/{video_name}_vdb.json"):
     result = memory.add_mm(
         video_path=video_path,
         frames_root="video/frames",
@@ -493,7 +531,7 @@ faiss_db/
 
 ### Multimodal Memory Storage
 
-TeleMem generates video-related storage files in the `./video/` directory:
+TeleMem generates video-related storage files in the `.data/samples/video/` directory:
 
 ```
 video/
@@ -541,8 +579,8 @@ video/
 
 ## Development and Contribution
 
-* Patch management process: Refer to [TeleMem-Overlay.md](TeleMem-Overlay.md)
-* Chinese documentation: [README-ZH.md](README-ZH.md)
+* Patch management process: Refer to [TeleMem-Overlay.md](docs/TeleMem-Overlay.md)
+* Chinese documentation: [README-ZH.md](docs/README-ZH.md)
 
 ---
 ## License
@@ -550,6 +588,7 @@ video/
 [Apache 2.0 License](LICENSE)
 
 ---
+
 ## Acknowledgements
 
 TeleMem’s development has been deeply inspired by open-source communities and cutting-edge research. We extend our sincere gratitude to the following projects and teams:
@@ -561,6 +600,15 @@ TeleMem’s development has been deeply inspired by open-source communities and 
 - [**Memento**](https://github.com/Agent-on-the-Fly/Memento)
   
 ------
+
+
+
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=TeleAI-UAGI/telemem&type=date&legend=top-left)](https://www.star-history.com/#TeleAI-UAGI/telemem&type=date&legend=top-left)
+
+---
 
 <div align="center">
 
@@ -575,4 +623,7 @@ Made with ❤️ by the Ubiquitous AGI team at TeleAI.
   &nbsp;&nbsp;&nbsp;
   <img src="assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
 </div>
+
+
+
 

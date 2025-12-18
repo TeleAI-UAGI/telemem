@@ -1,10 +1,40 @@
+<p align="center">
+  <a href="https://github.com/TeleAI-UAGI/telemem">
+    <img src="../assets/TeleMem.png" width="40%" />
+  </a>
+</p>
+
+<h1 align="center"> TeleMem: Building Long-Term and Multimodal Memory for Agentic AI </h1>
+
+<p align="center">
+  <a href="https://www.arxiv.org/pdf/2510.23981">
+    <img src="https://img.shields.io/badge/arXiv-Paper-red" alt="arXiv">
+  </a>
+  <a href="https://github.com/TeleAI-UAGI/telemem">
+    <img src="https://img.shields.io/github/stars/TeleAI-UAGI/TeleMem?style=social" alt="GitHub Stars">
+  </a>
+  <a href="https://github.com/TeleAI-UAGI/TeleMem/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-Apache%20License%202.0-blue" alt="License: Apache 2.0">
+  </a>
+  <img src="https://img.shields.io/github/last-commit/TeleAI-UAGI/TeleMem?color=blue" alt="Last Commit">
+  <img src="https://img.shields.io/badge/PRs-Welcome-red" alt="PRs Welcome">
+</p>
+
+<div align="left">
+
+**If you find this project helpful, please give us a ⭐️ on GitHub for the latest update.**
+
+</div>
+
+---
+
 <div align="center">
-  <h1>TeleMem</h1>
   <p>
-      <a href="README.md">English</a> | <a href="README-ZH.md">简体中文</a>
+      <a href="../README.md">English</a> | <a href="README-ZH.md">简体中文</a>
   </p>
   <p>
-      <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory"> Awesome-Agent-Memory →</strong></a>
+      <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory">   <p>
+      <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory"> <strong>📄 Awesome-Agent-Memory →</strong></a>
   </p>
 </div>
 
@@ -14,7 +44,7 @@ TeleMem是一个*完全兼容Mem0* 的高级记忆管理系统，专为 **多轮
 
 在此基础上，实现了**视频理解、多模态推理与视觉问答** 能力，通过视频帧提取、字幕生成、向量数据库构建的完整流水线，使 AI Agent 能够像处理文本记忆一样，轻松**存储、检索和推理视频内容**。
 
-📘 Overlay 模式开发说明：[TeleMem-Overlay.md](TeleMem-Overlay.md)
+📘 Overlay 模式开发说明：[TeleMem-Overlay-ZH.md](TeleMem-Overlay-ZH.md)
 
 <div align="left">
 
@@ -28,23 +58,32 @@ TeleMem是一个*完全兼容Mem0* 的高级记忆管理系统，专为 **多轮
 
 ```
 telemem/
+├── assets/                   # 文档资源与插图素材
 ├── vendor/
-│   └── mem0/                   # 上游仓库源代码（通过 git subtree 引入）
+│   └── mem0/                 # 上游 Mem0 仓库源代码（通过 git subtree 引入）
 ├── overlay/
-│   └── patches/                # TeleMem 自定义补丁文件 (.patch)
-├── scripts/                    # Overlay 管理脚本
-│   ├── init_upstream.sh        # 初始化上游 subtree
-│   ├── update_upstream.sh      # 同步上游并重新打补丁
-│   ├── record_patch.sh         # 记录本地修改为补丁
-│   └── apply_patches.sh        # 应用补丁
-├── PATCHES.md                  # 补丁列表及说明
-├── TeleMem-Overlay.md          # Overlay 开发说明（英文）
-├── TeleMem-Overlay-ZH.md       # Overlay 开发说明（中文）
-├── README.md                   # 英文版 README
-├── README-ZH.md                # 本文件
-├── requirements.txt            # 运行环境
-├── quickstart.py		        # 快速开始
-└── quickstart_mm.py            # 快速开始（多模态）
+│   └── patches/              # TeleMem 自定义补丁文件（.patch），用于扩展与修改上游代码
+├── scripts/                  # Overlay 管理与自动化脚本
+│   ├── init_upstream.sh      # 初始化上游 subtree 仓库
+│   ├── update_upstream.sh    # 同步上游更新并重新应用 TeleMem 补丁
+│   ├── record_patch.sh       # 将本地代码修改记录为可复现的补丁文件
+│   └── apply_patches.sh      # 应用补丁构建 TeleMem 完整代码
+├── baselines/                # 对比评测使用的基线方法实现
+│   ├── RAG                   # Retrieval-Augmented Generation（检索增强生成）基线
+│   ├── MemoBase              # MemoBase 记忆管理系统
+│   ├── MOOM                  # MOOM 双分支叙事记忆框架
+│   ├── A-mem                 # A-mem 智能体记忆系统基线
+│   └── Mem0                  # Mem0 基线实现
+├── data/                     # 用于评测或演示的小规模示例数据集
+├── examples/                 # 示例代码与教程 Demo
+│   ├── quickstart.py         # 快速入门示例（文本记忆）
+│   └── quickstart_mm.py      # 快速入门示例（多模态记忆）
+├── docs/                     # 项目文档、教程与开发者指南
+│   ├── TeleMem-Overlay.md    # Overlay 开发指南（英文版）
+│   ├── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
+│   └── README-ZH.md          # 项目中文说明文档
+├── PATCHES.md                # TeleMem 补丁列表及功能说明
+└── README.md                 # 项目英文总说明文档（本文件）
 ```
 
 ---
@@ -94,7 +133,7 @@ TeleMem 通过一套深度优化的**角色化摘要生成 → 语义聚类去�
 * 多模态 Agent 记忆管理
 * 长视频理解与信息检索
 
-![image](assets/overview.png)
+![image](../assets/overview.png)
 
 ---
 
@@ -185,7 +224,7 @@ vim vendor/TeleMem/config.yaml
 ### 示例
 
 ```python
-# quickstart.py
+# python examples/quickstart.py
 from vendor.TeleMem.TeleMemory import TeleMemory
 from vendor.TeleMem.utils import load_config
 
@@ -352,9 +391,9 @@ def add_mm(
 ```python
 {
     "video_name": "3EQLFHRHpag",
-    "frames_dir": "video/frames/3EQLFHRHpag/frames",
-    "caption_json": "video/captions/3EQLFHRHpag/captions.json",
-    "vdb_json": "video/vdb/3EQLFHRHpag/3EQLFHRHpag_vdb.json"
+    "frames_dir": "data/samples/video/frames/3EQLFHRHpag/frames",
+    "caption_json": "data/samples/video/captions/3EQLFHRHpag/captions.json",
+    "vdb_json": "data/samples/video/vdb/3EQLFHRHpag/3EQLFHRHpag_vdb.json"
 }
 ```
 
@@ -398,7 +437,7 @@ def search_mm(
 运行多模态演示：
 
 ```bash
-python quickstart_mm.py
+python examples/quickstart_mm.py
 ```
 
 完整代码示例：
@@ -413,16 +452,16 @@ config = load_config("vendor/TeleMem/config.yaml")
 memory = TeleMemory.from_config(config)
 
 # Define paths
-video_path = "video/3EQLFHRHpag.mp4"
+video_path = "data/samples/video/3EQLFHRHpag.mp4"
 video_name = os.path.splitext(os.path.basename(video_path))[0]
 
 # Step 1: Add video to memory (auto-processing)
 if not os.path.exists(f"video/vdb/{video_name}/{video_name}_vdb.json"):
     result = memory.add_mm(
         video_path=video_path,
-        frames_root="video/frames",
-        captions_root="video/captions",
-        vdb_root="video/vdb",
+        frames_root="data/samples/video/frames",
+        captions_root="data/samples/video/captions",
+        vdb_root="data/samples/video/vdb",
     )
     print(f"Video processing complete: {result}")
 
@@ -483,7 +522,7 @@ faiss_db/
 
 ### 多模态记忆存储
 
-TeleMem 在 `./video/` 目录下生成视频相关的存储文件：
+TeleMem 在 `./data/samples/video/` 目录下生成视频相关的存储文件：
 
 ```
 video/
@@ -528,13 +567,13 @@ video/
 ------
 ## 开发与贡献
 
-* 补丁管理流程：参考 [TeleMem-Overlay.md](TeleMem-Overlay.md)
-* 英文文档：[README.md](README.md)
+* 补丁管理流程：参考 [TeleMem-Overlay-ZH.md](TeleMem-Overlay-ZH.md)
+* 英文文档：[README.md](../README.md)
 
 ---
 ## 许可证
 
-[Apache 2.0 License](LICENSE)
+[Apache 2.0 License](../LICENSE)
 
 ---
 ## 致谢
@@ -558,8 +597,7 @@ Made with ❤️ by the Ubiquitous AGI team at TeleAI.
 </div>
 
 <div align="center" style="margin-top: 10px;">
-  <img src="assets/TeleAI.jpg" alt="TeleAI Logo" height="120px" />
+  <img src="../assets/TeleAI.jpg" alt="TeleAI Logo" height="120px" />
   &nbsp;&nbsp;&nbsp;
-  <img src="assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
+  <img src="../assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
 </div>
-
