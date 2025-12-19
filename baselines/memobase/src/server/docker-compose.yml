@@ -1,0 +1,67 @@
+# name: memobase-server
+services:
+  memobase-server-db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    container_name: memobase-server-db
+    environment:
+      - POSTGRES_USER=${DATABASE_USER}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_DB=${DATABASE_NAME}
+    ports:
+      - '${DATABASE_EXPORT_PORT}:5432'
+    volumes:
+      - ${DATABASE_LOCATION}:/var/lib/postgresql/data
+      # - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  memobase-server-redis:
+    image: redis:7.4
+    restart: unless-stopped
+    container_name: memobase-server-redis
+    ports:
+      - "${REDIS_EXPORT_PORT}:6379"
+    volumes:
+      - ${REDIS_LOCATION}:/data
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      
+  memobase-server-api:
+    platform: linux/amd64
+    container_name: memobase-server-api
+    environment:
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@memobase-server-db:5432/${DATABASE_NAME}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@memobase-server-redis:6379/0
+      - ACCESS_TOKEN=${ACCESS_TOKEN}
+      - PROJECT_ID=${PROJECT_ID}
+      - API_HOSTS=${API_HOSTS}
+      - USE_CORS=${USE_CORS}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      memobase-server-db:
+        condition: service_healthy
+      memobase-server-redis:
+        condition: service_healthy
+    ports:
+      - '${API_EXPORT_PORT}:8000'
+    build:
+      context: ./api
+    volumes:
+      - ./api/config.yaml:/app/config.yaml
+
+volumes:
+  memobase-server-db:
+    driver: local
+  memobase-server-redis:
+    driver: local
+  memobase-server-api:
+    driver: local

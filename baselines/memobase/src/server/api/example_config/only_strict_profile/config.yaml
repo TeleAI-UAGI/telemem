@@ -1,0 +1,21 @@
+llm_api_key: XXX
+llm_base_url: https://api.openai.com/v1/
+best_llm_model: gpt-4o
+
+enable_event_embedding: false
+enable_event_summary: false
+profile_strict_mode: true
+
+overwrite_user_profiles:
+  - topic: "basic_info"
+    sub_topics:
+      - name: "name"
+      - name: "age"
+      - name: "gender"
+      - name: "occupation"
+        description: "user's professional background"
+      - name: "location"
+      - name: "languages"
+        description: "languages the user speaks"
+      - name: "timezone"
+        description: "user's local timezone for scheduling"

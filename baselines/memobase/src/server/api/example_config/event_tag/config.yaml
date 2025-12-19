@@ -1,0 +1,16 @@
+llm_api_key: XXX
+llm_base_url: https://api.openai.com/v1/
+best_llm_model: gpt-4o
+
+language: en
+
+event_tags:
+  - name: "mental_health"
+    description: |
+      You need to look at user's mental health status and pick the most relevant tag from the following list:
+      - depression
+      - anxiety
+      - stress
+      - anger
+      - sadness
+      - happiness

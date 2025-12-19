@@ -1,0 +1,53 @@
+llm_api_key: XXX
+llm_base_url: https://api.openai.com/v1/
+best_llm_model: gpt-4o
+
+overwrite_user_profiles:
+  - topic: "basic_info"
+    sub_topics:
+      - name: "name"
+      - name: "age"
+      - name: "gender"
+      - name: "occupation"
+        description: "user's professional background"
+      - name: "location"
+      - name: "languages"
+        description: "languages the user speaks"
+      - name: "timezone"
+        description: "user's local timezone for scheduling"
+
+  - topic: "companion_preferences"
+    sub_topics:
+      - name: "companion_type"
+        description: "preferred ai companion personality type"
+      - name: "interaction_style"
+        description: "formal, casual, friendly, professional etc."
+      - name: "communication_freq"
+        description: "how often they want to interact with the ai"
+      - name: "interest_topics"
+        description: "preferred conversation topics"
+      - name: "learning_goals"
+        description: "what they want to learn or achieve"
+      - name: "privacy_prefs"
+        description: "data sharing and storage preferences"
+
+  - topic: "interaction_history"
+    sub_topics:
+      - name: "convo_count"
+      - name: "favorite_topics"
+      - name: "active_projects"
+      - name: "saved_convos"
+      - name: "feedback_hist"
+        description: "user's previous feedback on interactions"
+
+  - topic: "personalization"
+    description: "tags for customizing ai behavior"
+    sub_topics:
+      - name: "humor_pref"
+        description: "whether they enjoy jokes and casual banter"
+      - name: "response_len"
+        description: "preferred length of ai responses"
+      - name: "tech_depth"
+        description: "preferred level of technical detail"
+      - name: "learn_style"
+        description: "visual, verbal, practical, etc."
