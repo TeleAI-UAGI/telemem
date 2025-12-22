@@ -7,7 +7,7 @@
 <h1 align="center"> TeleMem: Building Long-Term and Multimodal Memory for Agentic AI </h1>
 
 <p align="center">
-  <a href="https://www.arxiv.org/pdf/2510.23981">
+  <a href="TeleMem_Tech_Report.pdf">
     <img src="https://img.shields.io/badge/arXiv-Paper-red" alt="arXiv">
   </a>
   <a href="https://github.com/TeleAI-UAGI/telemem">
