@@ -1,6 +1,6 @@
 from vendor.TeleMem.utils import load_config
 from mem0.configs.base import MemoryConfig
-import TeleMem as mem0
+import vendor.TeleMem as mem0
 import os
 
 # Initialize
