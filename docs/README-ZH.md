@@ -218,19 +218,21 @@ pip install -r requirements.txt
 bash scripts/apply_patches.sh
 
 # 配置模型参数（必做）
-vim vendor/TeleMem/config.yaml
+vim config/config.yaml
 ```
 
 ### 示例
 
 ```python
 # python examples/quickstart.py
-from vendor.TeleMem.TeleMemory import TeleMemory
 from vendor.TeleMem.utils import load_config
+from mem0.configs.base import MemoryConfig
+import vendor.TeleMem as mem0
 
 # Load configuration and initialize memory system
-config = load_config("vendor/TeleMem/config.yaml")
-memory = TeleMemory.from_config(config)
+config = load_config("config/config.yaml")
+config = MemoryConfig(**config)
+memory = mem0.Memory(config)
 
 # Simulate multi-turn dialogue data
 messages = [
@@ -443,13 +445,15 @@ python examples/quickstart_mm.py
 完整代码示例：
 
 ```python
-from vendor.TeleMem.TeleMemory import TeleMemory
 from vendor.TeleMem.utils import load_config
+from mem0.configs.base import MemoryConfig
+import vendor.TeleMem as mem0
 import os
 
 # Initialize
-config = load_config("vendor/TeleMem/config.yaml")
-memory = TeleMemory.from_config(config)
+config = load_config("config/config.yaml")
+config = MemoryConfig(**config)
+memory = mem0.Memory(config)
 
 # Define paths
 video_path = "data/samples/video/3EQLFHRHpag.mp4"
