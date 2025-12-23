@@ -38,7 +38,7 @@
   </p>
 </div>
 
-TeleMem is an advanced memory management system **fully compatible with Mem0**, deeply optimized for complex scenarios involving **multi-turn dialogues**, **character modeling**, **long-term information storage**, and **semantic retrieval**.
+TeleMem is an advanced agent memory management system that can be used as <mark>**a drop-in replacement for Mem0** (`import vendor.TeleMem as mem0`)</mark>, deeply optimized for complex scenarios involving **multi-turn dialogues**, **character modeling**, **long-term information storage**, and **semantic retrieval**.
 
 Through its unique **context-aware enhancement mechanism**, TeleMem provides conversational AI with core infrastructure offering **higher accuracy**, **faster performance**, and **stronger character memory capabilities**.
 
