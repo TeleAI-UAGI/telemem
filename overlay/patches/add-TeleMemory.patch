@@ -1,11 +1,20 @@
-diff --git a/vendor/TeleMem/TeleMemory.py b/vendor/TeleMem/TeleMemory.py
+diff --git a/vendor/TeleMem/__init__.py b/vendor/TeleMem/__init__.py
 new file mode 100644
-index 0000000..b166fe0
+index 0000000..e239bf5
 --- /dev/null
-+++ b/vendor/TeleMem/TeleMemory.py
-@@ -0,0 +1,835 @@
-+from mem0 import Memory
-+from vendor.TeleMem.utils import (
++++ b/vendor/TeleMem/__init__.py
+@@ -0,0 +1,2 @@
++from mem0 import *
++from .main import TeleMemory as Memory
+\ No newline at end of file
+diff --git a/vendor/TeleMem/main.py b/vendor/TeleMem/main.py
+new file mode 100644
+index 0000000..90f5285
+--- /dev/null
++++ b/vendor/TeleMem/main.py
+@@ -0,0 +1,852 @@
++import mem0
++from TeleMem.utils import (
 +    load_config,
 +    parse_messages,
 +    get_recent_messages_prompt,
@@ -49,10 +58,12 @@ index 0000000..b166fe0
 +from video_utils import decode_video_to_frames
 +
 +logger = logging.getLogger(__name__)
++logging.disable(logging.INFO)
 +
-+class TeleMemory(Memory):
-+    def __init__(self, *args, config_path="vendor/TeleMem/config.yaml", **kwargs):
++class TeleMemory(mem0.Memory):
++    def __init__(self, *args, config_path="config/config.yaml", telemem_feature=True, **kwargs):
 +        super().__init__(*args, **kwargs)
++        self.telemem_feature = telemem_feature
 +        config = load_config(config_path)
 +
 +        self.buffer_size = config["buffer_size"]
@@ -519,6 +530,9 @@ index 0000000..b166fe0
 +            DatabaseError: If database operations fail.
 +        """
 +
++        if not self.telemem_feature:
++            return super().add(messages, user_id=user_id, agent_id=agent_id, run_id=run_id, metadata=metadata, infer=infer, memory_type=memory_type, prompt=prompt)
++
 +        sample_id = metadata.get("sample_id") if metadata and isinstance(metadata, dict) else None
 +        user_list = metadata.get("user") if metadata and isinstance(metadata, dict) else None
 +        merged_messages = merge_consecutive_messages(messages)
@@ -548,7 +562,12 @@ index 0000000..b166fe0
 +            }
 +
 +            # print(f"Submitted {len(future_to_idx)} tasks.")
-+            for future in concurrent.futures.as_completed(future_to_idx):
++            for future in tqdm(
++                    concurrent.futures.as_completed(future_to_idx),
++                    total=len(future_to_idx),
++                    desc="Processing rounds",
++                    unit="round"
++                ):
 +                idx = future_to_idx[future]
 +                try:
 +                    buffer_item, person_memories_1, person_memories_2 = future.result()
@@ -596,6 +615,7 @@ index 0000000..b166fe0
 +                "summary": mem["summary"],
 +                "user": mem["user"],
 +                "sample_id": mem["sample_id"],
++                "original_messages": mem["original_messages"],
 +                "round_index": mem["round_index"],
 +                "timestamp": mem["timestamp"]
 +            })
@@ -611,6 +631,7 @@ index 0000000..b166fe0
 +                "summary": mem["summary"],
 +                "user": mem["user"],
 +                "sample_id": mem["sample_id"],
++                "original_messages": mem["original_messages"],
 +                "round_index": mem["round_index"],
 +                "timestamp": mem["timestamp"]
 +            })
@@ -665,6 +686,9 @@ index 0000000..b166fe0
 +                  Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
 +        """
 +
++        if not self.telemem_feature:
++            return super().search(query, user_id=user_id, agent_id=agent_id, run_id=run_id, limit=limit, filters=filters, threshold=threshold, rerank=rerank)
++
 +        if not run_id:
 +            raise ValueError("run_id is required for search operation")
 +
@@ -700,7 +724,9 @@ index 0000000..b166fe0
 +        results["events"] = _search_in_index("events", limit)
 +        results["person_1"] = _search_in_index("person_1", limit)
 +        results["person_2"] = _search_in_index("person_2", limit)
-+        results["combined"] = results["events"] + results["person_1"] + results["person_2"]
++        # results["combined"] = results["events"] + results["person_1"] + results["person_2"]
++        # results["combined"] = results["events"]
++        results["combined"] = results["person_1"] + results["person_2"]
 +
 +        return " ".join(results["combined"])
 +
@@ -744,12 +770,12 @@ index 0000000..b166fe0
 +        captions_root_abs = os.path.abspath(os.path.join(BASE_DIR, captions_root))
 +        vdb_root_abs = os.path.abspath(os.path.join(BASE_DIR, vdb_root))
 +
-+        
++
 +        video_frames_dir = os.path.join(frames_root_abs, video_name, "frames")
-+        
++
 +        video_caption_dir = os.path.join(captions_root_abs, video_name)
 +        caption_json_path = os.path.join(video_caption_dir, "captions.json")
-+        
++
 +        video_vdb_dir = os.path.join(vdb_root_abs, video_name)
 +        vdb_json_path = os.path.join(video_vdb_dir, f"{video_name}_vdb.json")
 +
@@ -777,7 +803,7 @@ index 0000000..b166fe0
 +        else:
 +            logger.info(f"[add_mm] Captioning frames -> {caption_json_path}")
 +            os.makedirs(video_caption_dir, exist_ok=True)
-+            
++
 +            # if clip_secs is not None:
 +            #     import config as _cfg
 +            #     _cfg.CLIP_SECS = clip_secs  # Simple override, takes effect globally
@@ -788,7 +814,7 @@ index 0000000..b166fe0
 +                subtitle_file_path=subtitle_path,
 +            )
 +
-+        # ---------------- ③ init_single_video_db -> vdb.json ------ 
++        # ---------------- ③ init_single_video_db -> vdb.json ------
 +        if os.path.isfile(vdb_json_path):
 +            logger.info(f"[add_mm] Skip building VDB: {vdb_json_path} already exists")
 +        else:
@@ -831,7 +857,7 @@ index 0000000..b166fe0
 +        Returns:
 +            messages: List of messages returned by MMCoreAgent.run(question)
 +        """
-+        
++
 +        agent = MMCoreAgent(
 +            video_db_path=video_db_path,
 +            video_caption_path=video_caption_path,
@@ -839,84 +865,6 @@ index 0000000..b166fe0
 +        )
 +        messages = agent.run(question)
 +        return messages
-diff --git a/vendor/TeleMem/__init__.py b/vendor/TeleMem/__init__.py
-new file mode 100644
-index 0000000..e69de29
-diff --git a/vendor/TeleMem/config.yaml b/vendor/TeleMem/config.yaml
-new file mode 100644
-index 0000000..f9ec5a6
---- /dev/null
-+++ b/vendor/TeleMem/config.yaml
-@@ -0,0 +1,69 @@
-+# config.yaml
-+llm:
-+  provider: openai
-+  config:
-+    model: qwen3-8b
-+    openai_base_url: http://localhost:4000/v1
-+    api_key: sk-xxx
-+
-+embedder:
-+  provider: openai
-+  config:
-+    model: qwen3-8b-embedding
-+    openai_base_url: http://localhost:4000/v1
-+    api_key: sk-xxx
-+
-+vector_store:
-+  provider: faiss
-+  config:
-+    collection_name: telemem
-+    path: db/faiss_db
-+
-+history_db_path: db/history.db
-+
-+buffer_size: 64
-+similarity_threshold: 0.95
-+faiss_dir: "./faiss_db"
-+
-+llm_client: "http://localhost:4000/v1"
-+llm_model: "qwen3-8b"
-+llm_api_key: "EMPTY"
-+
-+emb_client: "http://localhost:4000/v1"
-+emb_model: "qwen3-8b-embedding"
-+emb_api_key: "EMPTY"
-+emb_dim: 4096
-+
-+vlm_client: "http://localhost:4000/v1"
-+vlm_model: "qwen3-omni"
-+vlm_api_key: "EMPTY"
-+
-+
-+# ================ mm_utils multi modal setting ================
-+# video download and segmentation
-+VIDEO_DATABASE_FOLDER: "./videomme_database/"
-+VIDEO_RESOLUTION: "360"
-+VIDEO_FPS: 2
-+CLIP_SECS: 10
-+
-+# model configuration
-+OPENAI_API_KEY: null
-+
-+# Azure OpenAI
-+AOAI_CAPTION_VLM_ENDPOINT_LIST: []
-+AOAI_CAPTION_VLM_MODEL_NAME: "gpt-4.1-mini"
-+AOAI_ORCHESTRATOR_LLM_ENDPOINT_LIST: []
-+AOAI_ORCHESTRATOR_LLM_MODEL_NAME: "o3"
-+AOAI_TOOL_VLM_ENDPOINT_LIST: []
-+AOAI_TOOL_VLM_MODEL_NAME: "gpt-4.1-mini"
-+AOAI_TOOL_VLM_MAX_FRAME_NUM: 50
-+AOAI_EMBEDDING_RESOURCE_LIST: []
-+AOAI_EMBEDDING_LARGE_MODEL_NAME: "text-embedding-3-large"
-+AOAI_EMBEDDING_LARGE_DIM: 3072
-+
-+# agent and tool setting
-+LITE_MODE: true
-+GLOBAL_BROWSE_TOPK: 300
-+OVERWRITE_CLIP_SEARCH_TOPK: 0
-+SINGLE_CHOICE_QA: true
-+MAX_ITERATIONS: 3
 \ No newline at end of file
 diff --git a/vendor/TeleMem/mm_utils/__init__.py b/vendor/TeleMem/mm_utils/__init__.py
 new file mode 100644
