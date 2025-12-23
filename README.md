@@ -228,7 +228,7 @@ pip install -r requirements.txt
 # Run patch application script (see TeleMem-Overlay.md for details)
 bash scripts/apply_patches.sh
 # Configure model parameters (required)
-vim vendor/TeleMem/config.yaml
+vim config/config.yaml
 ```
 
 ### Example
