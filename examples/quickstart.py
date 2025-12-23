@@ -1,7 +1,7 @@
 # quickstart.py
 from vendor.TeleMem.utils import load_config
 from mem0.configs.base import MemoryConfig
-import TeleMem as mem0
+import vendor.TeleMem as mem0
 
 # Load configuration and initialize memory system
 config = load_config("config/config.yaml")
