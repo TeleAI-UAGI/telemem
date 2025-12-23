@@ -235,12 +235,14 @@ vim vendor/TeleMem/config.yaml
 
 ```python
 # python examples/quickstart.py
-from vendor.TeleMem.TeleMemory import TeleMemory
 from vendor.TeleMem.utils import load_config
+from mem0.configs.base import MemoryConfig
+import vendor.TeleMem as mem0
 
 # Load configuration and initialize memory system
 config = load_config("config/config.yaml")
-memory = TeleMemory.from_config(config)
+config = MemoryConfig(**config)
+memory = mem0.Memory(config)
 
 # Simulate multi-turn dialogue data
 messages = [
@@ -452,12 +454,14 @@ Complete code example:
 
 ```python
 from vendor.TeleMem.TeleMemory import TeleMemory
-from vendor.TeleMem.utils import load_config
+from mem0.configs.base import MemoryConfig
+import vendor.TeleMem as mem0
 import os
 
 # Initialize
 config = load_config("config/config.yaml")
-memory = TeleMemory.from_config(config)
+config = MemoryConfig(**config)
+memory = mem0.Memory(config)
 
 # Define paths
 video_path = "data/samples/video/3EQLFHRHpag.mp4"
