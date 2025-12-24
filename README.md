@@ -189,6 +189,7 @@ Memory capability was assessed via QA benchmarks, e.g.:
 - LLM: [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) (thinking mode disabled)
 - Embedding model: [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)
 - Metric: QA accuracy
+
     | Method                                                    | Overall(%) |
     |:--------------------------------------------------------- |:---------- |
     | RAG                                                       | 62.45      |
@@ -197,9 +198,8 @@ Memory capability was assessed via QA benchmarks, e.g.:
     | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
     | [Mem0](https://github.com/mem0ai/mem0)                    | 70.20      |
     | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  |
-
 <!--
-    | Long-Context LLM (slow and expensive) | 84.92      |
+    | Long-Context LLM (Slow and Expensive)                     | 84.92      |
 -->
 
 ---
