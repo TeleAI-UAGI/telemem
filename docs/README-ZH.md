@@ -179,22 +179,19 @@ TeleMem 相比于 Mem0 针对 **角色化、长期化、高性能** 核心需求
 * 大语言模型：统一使用[ Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B)，关闭thinking模式
 * 嵌入模型：统一使用 [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)
 * 评价指标：记忆问答准确率
-* Baseline
-  * RAG：将所有对话作为知识库
-  * Long context LLM：所有对话全放入LLM的上下文中
-  * [Memobase](https://github.com/memodb-io/memobase), [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogu), [A-mem](https://github.com/agiresearch/A-mem), [Mem0](https://github.com/mem0ai/mem0)：开源记忆系统
 
+    | Method                                                    | Overall(%) |
+    |:--------------------------------------------------------- |:---------- |
+    | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  |
+    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      |
+    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
+    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      |
+    | _[Mem0](https://github.com/mem0ai/mem0)_                    | _70.20_      |
+    | RAG                                                       | 62.45      |
 
-
-|  Method  | Overall(%) |
-| :------: | :--------: |
-|   RAG   |   62.45   |
-| Memobase |   76.78   |
-|   MOOM   |   72.60   |
-|  A-mem  |   73.78   |
-|   Mem0   |   70.20   |
-| Long context LLM |   84.92   |
-| **TeleMem** |   **86.33**   |
+<!--
+    | Long-Context LLM (Slow and Expensive)                     | 84.92      |
+-->
 
 ---
 
