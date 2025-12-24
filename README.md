@@ -192,12 +192,13 @@ Memory capability was assessed via QA benchmarks, e.g.:
 
     | Method                                                    | Overall(%) |
     |:--------------------------------------------------------- |:---------- |
-    | RAG                                                       | 62.45      |
-    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      |
-    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      |
-    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
-    | [Mem0](https://github.com/mem0ai/mem0)                    | 70.20      |
     | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  |
+    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      |
+    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
+    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      |
+    | _[Mem0](https://github.com/mem0ai/mem0)_                    | _70.20_      |
+    | RAG                                                       | 62.45      |
+
 <!--
     | Long-Context LLM (Slow and Expensive)                     | 84.92      |
 -->
