@@ -133,7 +133,7 @@ TeleMem 通过一套深度优化的**角色化摘要生成 → 语义聚类去�
 * 多模态 Agent 记忆管理
 * 长视频理解与信息检索
 
-![image](../assets/overview.png)
+![image](../assets/text-writing.png)
 
 ---
 
