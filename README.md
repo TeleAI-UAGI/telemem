@@ -186,27 +186,21 @@ Memory capability was assessed via QA benchmarks, e.g.:
 
 ### Experimental Configuration
 
-* LLM: [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) (thinking mode disabled)
-* Embedding model: [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)
-* Metric: QA accuracy
+- LLM: [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) (thinking mode disabled)
+- Embedding model: [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)
+- Metric: QA accuracy
+    | Method                                                    | Overall(%) |
+    |:--------------------------------------------------------- |:---------- |
+    | RAG                                                       | 62.45      |
+    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      |
+    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      |
+    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
+    | [Mem0](https://github.com/mem0ai/mem0)                    | 70.20      |
+    | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  |
 
-* Baselines
-
-  * RAG: All dialogue treated as knowledge base
-
-  * Long context LLM: Full dialogue input into LLM context
-
-  * [Memobase](https://github.com/memodb-io/memobase), [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue), [A-mem](https://github.com/agiresearch/A-mem), [Mem0](https://github.com/mem0ai/mem0): Open-source memory systems
-    
-    | Method           | Overall(%) |
-    |:---------------- |:---------- |
-    | RAG              | 62.45      |
-    | Memobase         | 76.78      |
-    | MOOM             | 72.60      |
-    | A-mem            | 73.78      |
-    | Mem0             | 70.20      |
-    | Long context LLM | 84.92      |
-    | **TeleMem**      | **86.33**  |
+<!--
+    | Long-Context LLM (slow and expensive) | 84.92      |
+-->
 
 ---
 
