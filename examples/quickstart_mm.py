@@ -1,12 +1,8 @@
-from vendor.TeleMem.utils import load_config
-from mem0.configs.base import MemoryConfig
 import vendor.TeleMem as mem0
 import os
 
 # Initialize
-config = load_config("config/config.yaml")
-config = MemoryConfig(**config)
-memory = mem0.Memory(config)
+memory = mem0.Memory()
 
 # Define paths
 video_path = "data/samples/video/3EQLFHRHpag.mp4"
