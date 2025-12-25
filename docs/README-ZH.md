@@ -213,23 +213,21 @@ pip install -r requirements.txt
 ```shell
 # 执行补丁应用脚本（详细说明见TeleMem-Overlay.md）
 bash scripts/apply_patches.sh
-
-# 配置模型参数（必做）
-vim config/config.yaml
 ```
 
 ### 示例
 
+设置OpenAI API key
+```shell
+export OPENAI_API_KEY="your-openai-api-key"
+```
+
 ```python
 # python examples/quickstart.py
-from vendor.TeleMem.utils import load_config
-from mem0.configs.base import MemoryConfig
 import vendor.TeleMem as mem0
 
 # Load configuration and initialize memory system
-config = load_config("config/config.yaml")
-config = MemoryConfig(**config)
-memory = mem0.Memory(config)
+memory = mem0.Memory()
 
 # Simulate multi-turn dialogue data
 messages = [
@@ -255,6 +253,14 @@ retrieved = memory.search(query=query, run_id="session_001", limit=3)
 print("Retrieval results:")
 print(retrieved)
 ```
+
+默认情况下，`Memory()` 会自动配置以下组件：
+
+- 使用 OpenAI 的 gpt-4.1-nano-2025-04-14 模型进行摘要提取与更新  
+- 使用 OpenAI 的 text-embedding-3-small 嵌入模型（1536 维）  
+- 使用 Faiss 向量存储，并将数据保存在磁盘上  
+
+如果需要自定义配置，请修改 `config/config.yaml` 文件。
 
 ---
 
@@ -442,15 +448,11 @@ python examples/quickstart_mm.py
 完整代码示例：
 
 ```python
-from vendor.TeleMem.utils import load_config
-from mem0.configs.base import MemoryConfig
 import vendor.TeleMem as mem0
 import os
 
 # Initialize
-config = load_config("config/config.yaml")
-config = MemoryConfig(**config)
-memory = mem0.Memory(config)
+memory = mem0.Memory()
 
 # Define paths
 video_path = "data/samples/video/3EQLFHRHpag.mp4"
