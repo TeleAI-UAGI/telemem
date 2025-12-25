@@ -222,22 +222,21 @@ pip install -r requirements.txt
 ```shell
 # Run patch application script (see TeleMem-Overlay.md for details)
 bash scripts/apply_patches.sh
-# Configure model parameters (required)
-vim config/config.yaml
 ```
 
 ### Example
 
+Set your OpenAI API key:
+```shell
+export OPENAI_API_KEY="your-openai-api-key"
+```
+
 ```python
 # python examples/quickstart.py
-from vendor.TeleMem.utils import load_config
-from mem0.configs.base import MemoryConfig
 import vendor.TeleMem as mem0
 
 # Load configuration and initialize memory system
-config = load_config("config/config.yaml")
-config = MemoryConfig(**config)
-memory = mem0.Memory(config)
+memory = mem0.Memory()
 
 # Simulate multi-turn dialogue data
 messages = [
@@ -263,6 +262,15 @@ retrieved = memory.search(query=query, run_id="session_001", limit=3)
 print("Retrieval results:")
 print(retrieved)
 ```
+By default `Memory()` wires up:
+
+- OpenAI gpt-4.1-nano-2025-04-14 for summary extraction and updates
+
+- OpenAI text-embedding-3-small embeddings (1536 dimensions)
+
+- Faiss vector store with on-disk data
+
+If you want to customize the configuration, please modify `config/config.yaml`.
 
 ---
 
@@ -448,15 +456,11 @@ python examples/quickstart_mm.py
 Complete code example:
 
 ```python
-from vendor.TeleMem.TeleMemory import TeleMemory
-from mem0.configs.base import MemoryConfig
 import vendor.TeleMem as mem0
 import os
 
 # Initialize
-config = load_config("config/config.yaml")
-config = MemoryConfig(**config)
-memory = mem0.Memory(config)
+memory = mem0.Memory()
 
 # Define paths
 video_path = "data/samples/video/3EQLFHRHpag.mp4"
