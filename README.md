@@ -44,6 +44,10 @@ Through its unique **context-aware enhancement mechanism**, TeleMem provides con
 
 Building upon this foundation, TeleMem implements **video understanding, multimodal reasoning, and visual question answering** capabilities. Through a complete pipeline of video frame extraction, caption generation, and vector database construction, AI Agents can effortlessly **store, retrieve, and reason over video content** just like handling text memories.
 
+The ultimate goal of the TeleMem project is to _use an agent's hindsight to improve its foresignt_. 
+
+**TeleMem, where memory lives on and intelligence grows strong.**
+
 ---
 
 📢 Latest Updates
@@ -55,15 +59,10 @@ Building upon this foundation, TeleMem implements **video understanding, multimo
 ## 🔥 Research Highlights
 
 * **Significantly improved memory accuracy**: Achieved **86.33%** accuracy on the ZH-4O Chinese multi-character long-dialogue benchmark, **19% higher** than Mem0.
-
 * **Doubled speed performance**: Millisecond-level semantic retrieval enabled by efficient buffering and batch writing.
-
 * **Greatly reduced token cost**: Optimized token usage delivers the same performance with significantly lower LLM overhead.
-
 * **Precise character memory preservation**: Automatically builds independent memory profiles for each character, eliminating confusion.
-
 * **Automated Video Processing Pipeline**: From raw video → frame extraction → caption generation → vector database, fully automated
-  
 * **ReAct-Style Video QA**: Multi-step reasoning + tool calling for precise video content understanding
 
 ## 📌 Table of Contents
@@ -72,10 +71,10 @@ Building upon this foundation, TeleMem implements **video understanding, multimo
 * [TeleMem vs Mem0: Core Advantages](#telemem-vs-mem0-core-advantages)
 * [Experimental Results](#experimental-results)
 * [Quick Start](#quick-start)
-* [Core Features](#core-features)
-* [Multimodal Features](#multimodal-features)
-* [Storage Structure Explanation](#storage-structure-explanation)
 * [Project Structure](#project-structure)
+* [Core Functions](#core-functions)
+* [Multimodal Extensions](#multimodal-extensions)
+* [Data Storage Explanation](#data-storage)
 * [Development and Contribution](#development-and-contribution)
 * [Acknowledgements](#acknowledgements)
 
@@ -221,19 +220,58 @@ retrieved = memory.search(query=query, run_id="session_001", limit=3)
 print("Retrieval results:")
 print(retrieved)
 ```
+
 By default `Memory()` wires up:
-
 - OpenAI gpt-4.1-nano-2025-04-14 for summary extraction and updates
-
 - OpenAI text-embedding-3-small embeddings (1536 dimensions)
-
 - Faiss vector store with on-disk data
 
 If you want to customize the configuration, please modify `config/config.yaml`.
 
 ---
 
-## Core Features
+## Project Structure
+
+<details>
+<summary>Expand/Collapse Directory Structure</summary>
+
+```
+telemem/
+├── assets/                 # Documentation assets and figures
+├── vendor/
+│ └── mem0/                 # Upstream repository source code
+├── overlay/
+│ └── patches/              # TeleMem custom patch files (.patch)
+├── scripts/                # Overlay management scripts
+│ ├── init_upstream.sh      # Initialize upstream subtree
+│ ├── update_upstream.sh    # Sync upstream and reapply patches
+│ ├── record_patch.sh       # Record local modifications as patches
+│ └── apply_patches.sh      # Apply patches
+├── baselines/              # Baseline implementations for comparative evaluation
+│ ├── RAG                   # Retrieval-Augmented Generation baseline
+│ ├── MemoBase              # MemoBase memory management system
+│ ├── MOOM                  # MOOM dual-branch narrative memory framework
+│ ├── A-mem                 # A-mem agent memory baseline
+│ └── Mem0                  # Mem0 baseline implementation
+├── config/               
+| └── config.yaml           # TeleMem configuration
+├── data/                   # Small sample datasets for evaluation or demonstration
+├── examples/               # Code examples and tutorial demos
+│ ├── quickstart.py         # Quick start
+│ └── quickstart_mm.py      # Quick start(Multimodel)
+├── docs/
+│ ├── TeleMem-Overlay.md    # Overlay development guide (English)
+│ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
+│ └── README-ZH.md          # Chinese README
+├── PATCHES.md              # Patch list and descriptions
+└── README.md               # This file
+```
+
+</details>
+
+---
+
+## Core Functions
 
 ### Add Memory (add)
 
@@ -313,7 +351,7 @@ def search(
 
 ---
 
-## Multimodal Features
+## Multimodal Extensions
 
 Beyond text memory, TeleMem further extends multimodal capabilities. Drawing inspiration from [Deep Video Discovery](https://github.com/microsoft/DeepVideoDiscovery)'s Agentic Search and Tool Use approach, we implemented two core methods in the TeleMemory class to support intelligent storage and semantic retrieval of video content.
 
@@ -458,8 +496,7 @@ print(f"Answer: ({answer})")
 
 ---
 
-
-## Storage Structure Explanation
+## Data Storage
 
 ### Text Memory Storage
 
@@ -537,47 +574,6 @@ video/
 
 ------
 
-## Project Structure
-
-<details>
-<summary>Expand/Collapse Directory Structure</summary>
-
-```
-telemem/
-├── assets/                 # Documentation assets and figures
-├── vendor/
-│ └── mem0/                 # Upstream repository source code
-├── overlay/
-│ └── patches/              # TeleMem custom patch files (.patch)
-├── scripts/                # Overlay management scripts
-│ ├── init_upstream.sh      # Initialize upstream subtree
-│ ├── update_upstream.sh    # Sync upstream and reapply patches
-│ ├── record_patch.sh       # Record local modifications as patches
-│ └── apply_patches.sh      # Apply patches
-├── baselines/              # Baseline implementations for comparative evaluation
-│ ├── RAG                   # Retrieval-Augmented Generation baseline
-│ ├── MemoBase              # MemoBase memory management system
-│ ├── MOOM                  # MOOM dual-branch narrative memory framework
-│ ├── A-mem                 # A-mem agent memory baseline
-│ └── Mem0                  # Mem0 baseline implementation
-├── config/               
-| └── config.yaml           # TeleMem configuration
-├── data/                   # Small sample datasets for evaluation or demonstration
-├── examples/               # Code examples and tutorial demos
-│ ├── quickstart.py         # Quick start
-│ └── quickstart_mm.py      # Quick start(Multimodel)
-├── docs/
-│ ├── TeleMem-Overlay.md    # Overlay development guide (English)
-│ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
-│ └── README-ZH.md          # Chinese README
-├── PATCHES.md              # Patch list and descriptions
-└── README.md               # This file
-```
-
-</details>
-
----
-
 ## Development and Contribution
 
 * Patch management process: Refer to [TeleMem-Overlay.md](docs/TeleMem-Overlay.md)
@@ -601,9 +597,6 @@ TeleMem’s development has been deeply inspired by open-source communities and 
 - [**Memento**](https://github.com/Agent-on-the-Fly/Memento)
   
 ------
-
-
-
 
 ## Star History
 
