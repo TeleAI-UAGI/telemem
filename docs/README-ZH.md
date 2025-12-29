@@ -20,9 +20,9 @@
   <img src="https://img.shields.io/badge/PRs-Welcome-red" alt="PRs Welcome">
 </p>
 
-<div align="left">
+<div align="center">
 
-**If you find this project helpful, please give us a ⭐️ on GitHub for the latest update.**
+**如果这个开源项目对您有帮助，请给我们一个⭐️.**
 
 </div>
 
@@ -44,47 +44,15 @@ TeleMem是一个大模型智能体的长期记忆管理系统，面向**多轮�
 
 在此基础上，实现了**视频理解、多模态推理与视觉问答** 能力，通过视频帧提取、字幕生成、向量数据库构建的完整流水线，使 AI Agent 能够像处理文本记忆一样，轻松**存储、检索和推理视频内容**。
 
-📘 Overlay 模式开发说明：[TeleMem-Overlay-ZH.md](TeleMem-Overlay-ZH.md)
+TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深谋远虑(foresight)_ 。
 
-<div align="left">
-
-**If you find this project helpful, please give us a ⭐️ on GitHub for the latest update.**
-
-</div>
+**TeleMem，使记忆持续、让智慧生长。**
 
 ---
 
-## 📦 项目结构
+## 📢 最新动态
 
-```
-telemem/
-├── assets/                   # 文档资源与插图素材
-├── vendor/
-│   └── mem0/                 # 上游 Mem0 仓库源代码（通过 git subtree 引入）
-├── overlay/
-│   └── patches/              # TeleMem 自定义补丁文件（.patch），用于扩展与修改上游代码
-├── scripts/                  # Overlay 管理与自动化脚本
-│   ├── init_upstream.sh      # 初始化上游 subtree 仓库
-│   ├── update_upstream.sh    # 同步上游更新并重新应用 TeleMem 补丁
-│   ├── record_patch.sh       # 将本地代码修改记录为可复现的补丁文件
-│   └── apply_patches.sh      # 应用补丁构建 TeleMem 完整代码
-├── baselines/                # 对比评测使用的基线方法实现
-│   ├── RAG                   # Retrieval-Augmented Generation（检索增强生成）基线
-│   ├── MemoBase              # MemoBase 记忆管理系统
-│   ├── MOOM                  # MOOM 双分支叙事记忆框架
-│   ├── A-mem                 # A-mem 智能体记忆系统基线
-│   └── Mem0                  # Mem0 基线实现
-├── data/                     # 用于评测或演示的小规模示例数据集
-├── examples/                 # 示例代码与教程 Demo
-│   ├── quickstart.py         # 快速入门示例（文本记忆）
-│   └── quickstart_mm.py      # 快速入门示例（多模态记忆）
-├── docs/                     # 项目文档、教程与开发者指南
-│   ├── TeleMem-Overlay.md    # Overlay 开发指南（英文版）
-│   ├── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
-│   └── README-ZH.md          # 项目中文说明文档
-├── PATCHES.md                # TeleMem 补丁列表及功能说明
-└── README.md                 # 项目英文总说明文档（本文件）
-```
+**[2025-12-05] 🎉 TeleMem v1.0.0 版本发布!**
 
 ---
 
@@ -97,15 +65,18 @@ telemem/
 * **自动视频处理流水线**：从原始视频 → 帧提取 → 字幕生成 → 向量数据库，全自动完成
 * **ReAct 风格视频问答**：多步推理 + 工具调用，实现精准的视频内容理解
 
+---
+
 ## 📌 目录
 
 * [项目介绍](#项目介绍)
 * [TeleMem vs Mem0：核心优势](#telemem-vs-mem0核心优势)
 * [实验结果](#实验结果)
 * [快速使用](#快速使用)
+* [项目结构](#项目结构)
 * [核心功能](#核心功能)
-* [多模态记忆功能](#多模态记忆功能)
-* [存储结构说明](#存储结构说明)
+* [多模态扩展](#多模态扩展)
+* [数据存储](#数据存储)
 * [开发与贡献](#开发与贡献)
 * [致谢](#致谢)
 
@@ -255,12 +226,50 @@ print(retrieved)
 ```
 
 默认情况下，`Memory()` 会自动配置以下组件：
-
 - 使用 OpenAI 的 gpt-4.1-nano-2025-04-14 模型进行摘要提取与更新  
 - 使用 OpenAI 的 text-embedding-3-small 嵌入模型（1536 维）  
 - 使用 Faiss 向量存储，并将数据保存在磁盘上  
 
 如果需要自定义配置，请修改 `config/config.yaml` 文件。
+
+---
+
+## 项目结构
+
+<details>
+<summary>展开/收起 目录结构</summary>
+
+```
+telemem/
+├── assets/                   # 文档资源与插图素材
+├── vendor/
+│   └── mem0/                 # 上游 Mem0 仓库源代码（通过 git subtree 引入）
+├── overlay/
+│   └── patches/              # TeleMem 自定义补丁文件（.patch），用于扩展与修改上游代码
+├── scripts/                  # Overlay 管理与自动化脚本
+│   ├── init_upstream.sh      # 初始化上游 subtree 仓库
+│   ├── update_upstream.sh    # 同步上游更新并重新应用 TeleMem 补丁
+│   ├── record_patch.sh       # 将本地代码修改记录为可复现的补丁文件
+│   └── apply_patches.sh      # 应用补丁构建 TeleMem 完整代码
+├── baselines/                # 对比评测使用的基线方法实现
+│   ├── RAG                   # Retrieval-Augmented Generation（检索增强生成）基线
+│   ├── MemoBase              # MemoBase 记忆管理系统
+│   ├── MOOM                  # MOOM 双分支叙事记忆框架
+│   ├── A-mem                 # A-mem 智能体记忆系统基线
+│   └── Mem0                  # Mem0 基线实现
+├── data/                     # 用于评测或演示的小规模示例数据集
+├── examples/                 # 示例代码与教程 Demo
+│   ├── quickstart.py         # 快速入门示例（文本记忆）
+│   └── quickstart_mm.py      # 快速入门示例（多模态记忆）
+├── docs/                     # 项目文档、教程与开发者指南
+│   ├── TeleMem-Overlay.md    # Overlay 开发指南（英文版）
+│   ├── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
+│   └── README-ZH.md          # 项目中文说明文档
+├── PATCHES.md                # TeleMem 补丁列表及功能说明
+└── README.md                 # 项目英文总说明文档（本文件）
+```
+
+</details>
 
 ---
 
@@ -346,7 +355,7 @@ def search(
 
 ---
 
-## 多模态记忆功能
+## 多模态扩展
 
 在文本记忆之外，TeleMem 进一步扩展了多模态能力。借鉴 [Deep Video Discovery](https://github.com/microsoft/DeepVideoDiscovery) 的 Agentic Search 与 Tool Use 思路，我们在 TeleMemory 类中实现了两个核心方法，支持视频内容的智能存储与语义检索。
 
@@ -491,7 +500,7 @@ print(f"Answer: ({answer})")
 
 ---
 
-## 存储结构说明
+## 数据存储
 
 ### 文本记忆存储
 
@@ -570,7 +579,7 @@ video/
 ------
 ## 开发与贡献
 
-* 补丁管理流程：参考 [TeleMem-Overlay-ZH.md](TeleMem-Overlay-ZH.md)
+* 叠加（Overlay）开发模式说明：[TeleMem-Overlay-ZH.md](TeleMem-Overlay-ZH.md)
 * 英文文档：[README.md](../README.md)
 
 ---
