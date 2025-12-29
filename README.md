@@ -576,7 +576,7 @@ video/
 
 ## Development and Contribution
 
-* Patch management process: Refer to [TeleMem-Overlay.md](docs/TeleMem-Overlay.md)
+* Overlay development process: [TeleMem-Overlay.md](docs/TeleMem-Overlay.md)
 * Chinese documentation: [README-ZH.md](docs/README-ZH.md)
 
 ---
