@@ -7,12 +7,80 @@ index 0000000..e239bf5
 +from mem0 import *
 +from .main import TeleMemory as Memory
 \ No newline at end of file
+diff --git a/vendor/TeleMem/configs.py b/vendor/TeleMem/configs.py
+new file mode 100644
+index 0000000..86a417d
+--- /dev/null
++++ b/vendor/TeleMem/configs.py
+@@ -0,0 +1,61 @@
++from mem0.configs.base import MemoryConfig as BaseMemoryConfig
++from pydantic import Field
++from typing import Optional, List
++import os
++
++
++class TeleMemoryConfig(BaseMemoryConfig):
++    buffer_size: int = Field(
++        description="Maximum number of events to buffer before flushing to vector store",
++        default=64,
++    )
++    similarity_threshold: float = Field(
++        description="Threshold for determining similarity between memories",
++        default=0.95,
++        ge=0.0,
++        le=1.0,
++    )
++    faiss_dir: str = Field(default="./faiss_db", description="Directory for FAISS index files")
++        # --- LLM client (direct OpenAI-compatible client config) ---
++    llm_client: str = Field(default="https://api.openai.com/v1")
++    llm_model: str = Field(default="gpt-4.1-nano-2025-04-14")
++    llm_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
++
++    # --- Embedding client ---
++    emb_client: str = Field(default="https://api.openai.com/v1")
++    emb_model: str = Field(default="text-embedding-3-small")
++    emb_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
++    emb_dim: int = Field(default=1536, ge=1)
++
++    # --- VLM (Vision-Language Model) client ---
++    vlm_client: str = Field(default="http://10.244.51.103:8081/v1")
++    vlm_model: str = Field(default="qwen3-omni")
++    vlm_api_key: str = Field(default="EMPTY")
++
++    # --- Multi-modal video settings ---
++    VIDEO_DATABASE_FOLDER: str = Field(default="./videomme_database/")
++    VIDEO_RESOLUTION: str = Field(default="360")
++    VIDEO_FPS: int = Field(default=2)
++    CLIP_SECS: int = Field(default=10)
++
++    # --- API keys (for compatibility) ---
++    OPENAI_API_KEY: Optional[str] = Field(default=None)
++
++    # --- Azure OpenAI (optional, kept as list for flexibility) ---
++    AOAI_CAPTION_VLM_ENDPOINT_LIST: List[str] = Field(default_factory=list)
++    AOAI_CAPTION_VLM_MODEL_NAME: str = Field(default="gpt-4.1-mini")
++    AOAI_ORCHESTRATOR_LLM_ENDPOINT_LIST: List[str] = Field(default_factory=list)
++    AOAI_ORCHESTRATOR_LLM_MODEL_NAME: str = Field(default="o3")
++    AOAI_TOOL_VLM_ENDPOINT_LIST: List[str] = Field(default_factory=list)
++    AOAI_TOOL_VLM_MODEL_NAME: str = Field(default="gpt-4.1-mini")
++    AOAI_TOOL_VLM_MAX_FRAME_NUM: int = Field(default=50)
++    AOAI_EMBEDDING_RESOURCE_LIST: List[str] = Field(default_factory=list)
++    AOAI_EMBEDDING_LARGE_MODEL_NAME: str = Field(default="text-embedding-3-large")
++    AOAI_EMBEDDING_LARGE_DIM: int = Field(default=3072)
++
++    # --- Agent/tool settings ---
++    LITE_MODE: bool = Field(default=True)
++    GLOBAL_BROWSE_TOPK: int = Field(default=300)
++    OVERWRITE_CLIP_SEARCH_TOPK: int = Field(default=0)
++    SINGLE_CHOICE_QA: bool = Field(default=True)
++    MAX_ITERATIONS: int = Field(default=3)
+\ No newline at end of file
 diff --git a/vendor/TeleMem/main.py b/vendor/TeleMem/main.py
 new file mode 100644
-index 0000000..90f5285
+index 0000000..af78f46
 --- /dev/null
 +++ b/vendor/TeleMem/main.py
-@@ -0,0 +1,852 @@
+@@ -0,0 +1,851 @@
 +import mem0
 +from TeleMem.utils import (
 +    load_config,
@@ -59,21 +127,20 @@ index 0000000..90f5285
 +
 +logger = logging.getLogger(__name__)
 +logging.disable(logging.INFO)
++from TeleMem.configs import TeleMemoryConfig
 +
 +class TeleMemory(mem0.Memory):
-+    def __init__(self, *args, config_path="config/config.yaml", telemem_feature=True, **kwargs):
-+        super().__init__(*args, **kwargs)
-+        self.telemem_feature = telemem_feature
-+        config = load_config(config_path)
++    def __init__(self, config: TeleMemoryConfig = TeleMemoryConfig()):
++        super().__init__(config)
 +
-+        self.buffer_size = config["buffer_size"]
-+        self.similarity_threshold = config["similarity_threshold"]
-+        self.faiss_dir = Path(config["faiss_dir"])
-+        self.llm_client = OpenAI(base_url=config["llm_client"], api_key=config["llm_api_key"])
-+        self.llm_model = config["llm_model"]
-+        self.emb_client = OpenAI(base_url=config["emb_client"], api_key=config["emb_api_key"])
-+        self.emb_model = config["emb_model"]
-+        self.emb_dim = config["emb_dim"]
++        self.buffer_size = self.config.buffer_size
++        self.similarity_threshold = self.config.similarity_threshold
++        self.faiss_dir = Path(self.config.faiss_dir)
++        self.llm_client = OpenAI(base_url=self.config.llm_client, api_key=self.config.llm_api_key)
++        self.llm_model = self.config.llm_model
++        self.emb_client = OpenAI(base_url=self.config.emb_client, api_key=self.config.emb_api_key)
++        self.emb_model = self.config.emb_model
++        self.emb_dim = self.config.emb_dim
 +
 +        self.events_buffer = {}
 +        self.buffer_locks = {}
