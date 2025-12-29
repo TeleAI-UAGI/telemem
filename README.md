@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/PRs-Welcome-red" alt="PRs Welcome">
 </p>
 
-<div align="left">
+<div align="center">
 
 **If you find this project helpful, please give us a ⭐️ on GitHub for the latest update.**
 
