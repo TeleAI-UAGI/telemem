@@ -50,7 +50,7 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 
 ---
 
-📢 Latest Updates
+## 📢 Latest Updates
 
 **[2025-12-05] 🎉 TeleMem v1.0 Released!**
 
