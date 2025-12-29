@@ -65,6 +65,8 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 * **Automated Video Processing Pipeline**: From raw video → frame extraction → caption generation → vector database, fully automated
 * **ReAct-Style Video QA**: Multi-step reasoning + tool calling for precise video content understanding
 
+---
+
 ## 📌 Table of Contents
 
 * [Project Introduction](#project-introduction)
