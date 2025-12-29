@@ -44,45 +44,11 @@ Through its unique **context-aware enhancement mechanism**, TeleMem provides con
 
 Building upon this foundation, TeleMem implements **video understanding, multimodal reasoning, and visual question answering** capabilities. Through a complete pipeline of video frame extraction, caption generation, and vector database construction, AI Agents can effortlessly **store, retrieve, and reason over video content** just like handling text memories.
 
-📘 Overlay Mode Development Documentation: [TeleMem-Overlay.md](docs/TeleMem-Overlay.md)
-
-
-
 ---
 
-## 📦 Project Structure
+📢 Latest Updates
 
-```
-telemem/
-├── assets/                 # Documentation assets and figures
-├── vendor/
-│ └── mem0/                 # Upstream repository source code
-├── overlay/
-│ └── patches/              # TeleMem custom patch files (.patch)
-├── scripts/                # Overlay management scripts
-│ ├── init_upstream.sh      # Initialize upstream subtree
-│ ├── update_upstream.sh    # Sync upstream and reapply patches
-│ ├── record_patch.sh       # Record local modifications as patches
-│ └── apply_patches.sh      # Apply patches
-├── baselines/              # Baseline implementations for comparative evaluation
-│ ├── RAG                   # Retrieval-Augmented Generation baseline
-│ ├── MemoBase              # MemoBase memory management system
-│ ├── MOOM                  # MOOM dual-branch narrative memory framework
-│ ├── A-mem                 # A-mem agent memory baseline
-│ └── Mem0                  # Mem0 baseline implementation
-├── config/               
-| └── config.yaml           # TeleMem configuration
-├── data/                   # Small sample datasets for evaluation or demonstration
-├── examples/               # Code examples and tutorial demos
-│ ├── quickstart.py         # Quick start
-│ └── quickstart_mm.py      # Quick start(Multimodel)
-├── docs/
-│ ├── TeleMem-Overlay.md    # Overlay development guide (English)
-│ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
-│ └── README-ZH.md          # Chinese README
-├── PATCHES.md              # Patch list and descriptions
-└── README.md               # This file
-```
+**[2025-12-05] 🎉 TeleMem v1.0 Released!**
 
 ---
 
@@ -103,21 +69,14 @@ telemem/
 ## 📌 Table of Contents
 
 * [Project Introduction](#project-introduction)
-
 * [TeleMem vs Mem0: Core Advantages](#telemem-vs-mem0-core-advantages)
-
 * [Experimental Results](#experimental-results)
-
 * [Quick Start](#quick-start)
-
 * [Core Features](#core-features)
-
-* [Multimodal Memory Features](#multimodel-memory-features)
-  
+* [Multimodal Features](#multimodal-features)
 * [Storage Structure Explanation](#storage-structure-explanation)
-
+* [Project Structure](#project-structure)
 * [Development and Contribution](#development-and-contribution)
-
 * [Acknowledgements](#acknowledgements)
 
 ---
@@ -192,12 +151,12 @@ Memory capability was assessed via QA benchmarks, e.g.:
 
     | Method                                                    | Overall(%) |
     |:--------------------------------------------------------- |:---------- |
-    | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  |
-    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      |
-    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
-    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      |
-    | _[Mem0](https://github.com/mem0ai/mem0)_                    | _70.20_      |
     | RAG                                                       | 62.45      |
+    | _[Mem0](https://github.com/mem0ai/mem0)_                    | _70.20_      |
+    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      |
+    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
+    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      |
+    | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  |
 
 <!--
     | Long-Context LLM (Slow and Expensive)                     | 84.92      |
@@ -354,7 +313,7 @@ def search(
 
 ---
 
-## Multimodal Memory Features
+## Multimodal Features
 
 Beyond text memory, TeleMem further extends multimodal capabilities. Drawing inspiration from [Deep Video Discovery](https://github.com/microsoft/DeepVideoDiscovery)'s Agentic Search and Tool Use approach, we implemented two core methods in the TeleMemory class to support intelligent storage and semantic retrieval of video content.
 
@@ -578,7 +537,46 @@ video/
 
 ------
 
+## Project Structure
 
+<details>
+<summary>Expand/Collapse Directory Structure</summary>
+
+```
+telemem/
+├── assets/                 # Documentation assets and figures
+├── vendor/
+│ └── mem0/                 # Upstream repository source code
+├── overlay/
+│ └── patches/              # TeleMem custom patch files (.patch)
+├── scripts/                # Overlay management scripts
+│ ├── init_upstream.sh      # Initialize upstream subtree
+│ ├── update_upstream.sh    # Sync upstream and reapply patches
+│ ├── record_patch.sh       # Record local modifications as patches
+│ └── apply_patches.sh      # Apply patches
+├── baselines/              # Baseline implementations for comparative evaluation
+│ ├── RAG                   # Retrieval-Augmented Generation baseline
+│ ├── MemoBase              # MemoBase memory management system
+│ ├── MOOM                  # MOOM dual-branch narrative memory framework
+│ ├── A-mem                 # A-mem agent memory baseline
+│ └── Mem0                  # Mem0 baseline implementation
+├── config/               
+| └── config.yaml           # TeleMem configuration
+├── data/                   # Small sample datasets for evaluation or demonstration
+├── examples/               # Code examples and tutorial demos
+│ ├── quickstart.py         # Quick start
+│ └── quickstart_mm.py      # Quick start(Multimodel)
+├── docs/
+│ ├── TeleMem-Overlay.md    # Overlay development guide (English)
+│ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
+│ └── README-ZH.md          # Chinese README
+├── PATCHES.md              # Patch list and descriptions
+└── README.md               # This file
+```
+
+</details>
+
+---
 
 ## Development and Contribution
 
