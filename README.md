@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center"> TeleMem: Building Long-Term and Multimodal Memory for Agentic AI </h1>
+<h1 align="center"> TeleMem: High-Performance Memory Layer for Agentic AI </h1>
 
 <p align="center">
   <a href="docs/TeleMem_Tech_Report.pdf">
