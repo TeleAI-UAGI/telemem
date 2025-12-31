@@ -9,13 +9,13 @@ index 0000000..e239bf5
 \ No newline at end of file
 diff --git a/vendor/TeleMem/configs.py b/vendor/TeleMem/configs.py
 new file mode 100644
-index 0000000..86a417d
+index 0000000..4be739c
 --- /dev/null
 +++ b/vendor/TeleMem/configs.py
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,46 @@
 +from mem0.configs.base import MemoryConfig as BaseMemoryConfig
 +from pydantic import Field
-+from typing import Optional, List
++from typing import Optional, List, Dict
 +import os
 +
 +
@@ -30,90 +30,67 @@ index 0000000..86a417d
 +        ge=0.0,
 +        le=1.0,
 +    )
-+    faiss_dir: str = Field(default="./faiss_db", description="Directory for FAISS index files")
-+        # --- LLM client (direct OpenAI-compatible client config) ---
-+    llm_client: str = Field(default="https://api.openai.com/v1")
-+    llm_model: str = Field(default="gpt-4.1-nano-2025-04-14")
-+    llm_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-+
-+    # --- Embedding client ---
-+    emb_client: str = Field(default="https://api.openai.com/v1")
-+    emb_model: str = Field(default="text-embedding-3-small")
-+    emb_api_key: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
-+    emb_dim: int = Field(default=1536, ge=1)
-+
-+    # --- VLM (Vision-Language Model) client ---
-+    vlm_client: str = Field(default="http://10.244.51.103:8081/v1")
-+    vlm_model: str = Field(default="qwen3-omni")
-+    vlm_api_key: str = Field(default="EMPTY")
-+
-+    # --- Multi-modal video settings ---
-+    VIDEO_DATABASE_FOLDER: str = Field(default="./videomme_database/")
-+    VIDEO_RESOLUTION: str = Field(default="360")
-+    VIDEO_FPS: int = Field(default=2)
-+    CLIP_SECS: int = Field(default=10)
-+
-+    # --- API keys (for compatibility) ---
-+    OPENAI_API_KEY: Optional[str] = Field(default=None)
-+
-+    # --- Azure OpenAI (optional, kept as list for flexibility) ---
-+    AOAI_CAPTION_VLM_ENDPOINT_LIST: List[str] = Field(default_factory=list)
-+    AOAI_CAPTION_VLM_MODEL_NAME: str = Field(default="gpt-4.1-mini")
-+    AOAI_ORCHESTRATOR_LLM_ENDPOINT_LIST: List[str] = Field(default_factory=list)
-+    AOAI_ORCHESTRATOR_LLM_MODEL_NAME: str = Field(default="o3")
-+    AOAI_TOOL_VLM_ENDPOINT_LIST: List[str] = Field(default_factory=list)
-+    AOAI_TOOL_VLM_MODEL_NAME: str = Field(default="gpt-4.1-mini")
-+    AOAI_TOOL_VLM_MAX_FRAME_NUM: int = Field(default=50)
-+    AOAI_EMBEDDING_RESOURCE_LIST: List[str] = Field(default_factory=list)
-+    AOAI_EMBEDDING_LARGE_MODEL_NAME: str = Field(default="text-embedding-3-large")
-+    AOAI_EMBEDDING_LARGE_DIM: int = Field(default=3072)
-+
-+    # --- Agent/tool settings ---
-+    LITE_MODE: bool = Field(default=True)
-+    GLOBAL_BROWSE_TOPK: int = Field(default=300)
-+    OVERWRITE_CLIP_SEARCH_TOPK: int = Field(default=0)
-+    SINGLE_CHOICE_QA: bool = Field(default=True)
-+    MAX_ITERATIONS: int = Field(default=3)
++    vlm: Dict = Field(
++        description="Configuration for the vistion language model",
++        default={
++            "vlm_client": "http://10.244.56.103:8001/v1",
++            "vlm_model": "qwen3-omni",
++            "vlm_api_key": "EMPTY",
++            "temperature": 0.3,
++            "VIDEO_DATABASE_FOLDER": "./videomme_database/",
++            "VIDEO_RESOLUTION": "360",
++            "VIDEO_FPS": 2,
++            "CLIP_SECS": 10,
++            "OPENAI_API_KEY": None,
++            "AOAI_CAPTION_VLM_ENDPOINT_LIST": [],
++            "AOAI_CAPTION_VLM_MODEL_NAME": "gpt-4.1-mini",
++            "AOAI_ORCHESTRATOR_LLM_ENDPOINT_LIST": [],
++            "AOAI_ORCHESTRATOR_LLM_MODEL_NAME": "o3",
++            "AOAI_TOOL_VLM_ENDPOINT_LIST": [],
++            "AOAI_TOOL_VLM_MODEL_NAME": "gpt-4.1-mini",
++            "AOAI_TOOL_VLM_MAX_FRAME_NUM": 50,
++            "AOAI_EMBEDDING_RESOURCE_LIST": [],
++            "AOAI_EMBEDDING_LARGE_MODEL_NAME": "text-embedding-3-large",
++            "AOAI_EMBEDDING_LARGE_DIM": 3072,
++            "LITE_MODE": True,
++            "GLOBAL_BROWSE_TOPK": 300,
++            "OVERWRITE_CLIP_SEARCH_TOPK": 0,
++            "SINGLE_CHOICE_QA": True,
++            "MAX_ITERATIONS": 3
++        }
++    )
 \ No newline at end of file
 diff --git a/vendor/TeleMem/main.py b/vendor/TeleMem/main.py
 new file mode 100644
-index 0000000..af78f46
+index 0000000..f838f6a
 --- /dev/null
 +++ b/vendor/TeleMem/main.py
-@@ -0,0 +1,851 @@
+@@ -0,0 +1,647 @@
 +import mem0
++from TeleMem.configs import TeleMemoryConfig
 +from TeleMem.utils import (
 +    load_config,
 +    parse_messages,
 +    get_recent_messages_prompt,
 +    get_person_prompt,
++    get_update_memory_prompt,
 +    extract_events_from_text,
 +    merge_consecutive_messages,
++    chunk_with_context,
 +    _cosine_similarity
 +)
 +from typing import Any, Dict, List, Optional
-+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-+import asyncio
-+import yaml
-+from tqdm import tqdm
-+import threading
-+import concurrent
-+import concurrent.futures
++from openai import OpenAI
++from copy import deepcopy
 +import json
++import hashlib
 +import logging
 +import os
++import uuid
 +import warnings
-+import numpy as np
-+import re
-+from copy import deepcopy
++import threading
 +from datetime import datetime
-+from typing import Any, Dict, Optional
-+import queue
-+import faiss
 +import pytz
-+from pydantic import ValidationError
-+from openai import OpenAI
-+import openai
 +from pathlib import Path
 +
 +import os
@@ -125,427 +102,135 @@ index 0000000..af78f46
 +from build_database import init_single_video_db
 +from video_utils import decode_video_to_frames
 +
++warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*SwigPy.*")
++warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*swigvarlink.*")
++
 +logger = logging.getLogger(__name__)
-+logging.disable(logging.INFO)
-+from TeleMem.configs import TeleMemoryConfig
 +
 +class TeleMemory(mem0.Memory):
 +    def __init__(self, config: TeleMemoryConfig = TeleMemoryConfig()):
 +        super().__init__(config)
-+
 +        self.buffer_size = self.config.buffer_size
 +        self.similarity_threshold = self.config.similarity_threshold
-+        self.faiss_dir = Path(self.config.faiss_dir)
-+        self.llm_client = OpenAI(base_url=self.config.llm_client, api_key=self.config.llm_api_key)
-+        self.llm_model = self.config.llm_model
-+        self.emb_client = OpenAI(base_url=self.config.emb_client, api_key=self.config.emb_api_key)
-+        self.emb_model = self.config.emb_model
-+        self.emb_dim = self.config.emb_dim
++        self.memory_buffer: Dict[str, List[Dict]] = {}
++        self.buffer_locks: Dict[str, threading.Lock] = {}
 +
-+        self.events_buffer = {}
-+        self.buffer_locks = {}
-+        self.flush_locks = {}
-+        self.file_locks = {}
-+        self.faiss_store = {}
-+        self.metadata_store = {}
-+        self.faiss_dir.mkdir(parents=True, exist_ok=True)
++    def _get_buffer_key(self, run_id: str, user_id: Optional[str]) -> str:
++        """生成唯一 buffer key: run_id + user_id 或 'events'"""
++        mem_type = "events" if user_id is None else f"person_{user_id}"
++        return f"{run_id}_{mem_type}"
 +
-+    def _get_faiss_index_path(self, sample_id, key):
-+        return self.faiss_dir / f"{sample_id}_{key}.index"
++    def _get_buffer_lock(self, buffer_key: str) -> threading.Lock:
++        if buffer_key not in self.buffer_locks:
++            self.buffer_locks[buffer_key] = threading.Lock()
++        return self.buffer_locks[buffer_key]
 +
-+    def _get_metadata_path(self, sample_id, key):
-+        return self.faiss_dir / f"{sample_id}_{key}_meta.json"
-+
-+    def _load_or_create_index(self, sample_id, key, dim=1024):
-+        index_path = self._get_faiss_index_path(sample_id, key)
-+        meta_path = self._get_metadata_path(sample_id, key)
-+
-+        if index_path.exists() and meta_path.exists():
-+            index = faiss.read_index(str(index_path))
-+            with open(meta_path, 'r', encoding='utf-8') as f:
-+                metadata = json.load(f)
-+        else:
-+            index = faiss.IndexFlatIP(dim)
-+            metadata = []
-+
-+        if sample_id not in self.faiss_store:
-+            self.faiss_store[sample_id] = {}
-+            self.metadata_store[sample_id] = {}
-+        self.faiss_store[sample_id][key] = index
-+        self.metadata_store[sample_id][key] = metadata
-+
-+    def _save_faiss_index(self, sample_id, key):
-+        index = self.faiss_store[sample_id][key]
-+        metadata = self.metadata_store[sample_id][key]
-+
-+        index_path = self._get_faiss_index_path(sample_id, key)
-+        meta_path = self._get_metadata_path(sample_id, key)
-+
-+        faiss.write_index(index, str(index_path))
-+        with open(meta_path, 'w', encoding='utf-8') as f:
-+            json.dump(metadata, f, ensure_ascii=False, indent=4)
-+
-+    def _get_buffer_lock(self, sample_id):
-+        """获取或创建指定 sample_id 的 buffer 锁"""
-+        if sample_id not in self.buffer_locks:
-+            self.buffer_locks[sample_id] = threading.Lock()
-+        return self.buffer_locks[sample_id]
-+
-+    def _get_flush_lock(self, sample_id):
-+        """获取或创建指定 sample_id 的 flush 锁"""
-+        if sample_id not in self.flush_locks:
-+            self.flush_locks[sample_id] = threading.Lock()
-+        return self.flush_locks[sample_id]
-+
-+    def _get_file_lock(self, sample_id):
-+        """获取或创建指定 sample_id 的文件访问锁 (用于磁盘文件级别的读写互斥)"""
-+        if sample_id not in self.file_locks:
-+            self.file_locks[sample_id] = threading.Lock()
-+        return self.file_locks[sample_id]
-+
-+    def _find_similar_memories(self, embedding, sample_id, threshold=0.95, top_k=10):
-+        """
-+        从 FAISS 向量库中查找相似的记忆。
-+        """
-+        similar_memories = []
-+
-+        self._load_or_create_index(sample_id, "events", dim=len(embedding))
-+
-+        index = self.faiss_store[sample_id]["events"]
-+        metadata = self.metadata_store[sample_id]["events"]
-+
-+        if index.ntotal == 0:
-+            return similar_memories
-+
-+        query_emb = np.array(embedding, dtype=np.float32)
-+        query_emb = query_emb / np.linalg.norm(query_emb)
-+        query_emb = query_emb.reshape(1, -1)
-+
-+        D, I = index.search(query_emb, top_k)
-+        seen_summaries = set()
-+        unique_similar_memories = []
-+
-+        for score, idx in zip(D[0], I[0]):
-+            if idx == -1:
-+                continue
-+            if score < threshold:
-+                break
-+            mem = metadata[idx]
-+            summary = mem.get("summary", "").strip()
-+            if summary and summary in seen_summaries:
-+                continue
-+            seen_summaries.add(summary)
-+            try:
-+                emb_vector = index.reconstruct(int(idx))
-+                emb_list = emb_vector.tolist()
-+            except Exception as e:
-+                logger.warning(f"Failed to reconstruct embedding for idx {idx}: {e}")
-+                emb_list = mem.get("embedding")
-+
-+            full_mem = {
-+                "summary": mem.get("summary"),
-+                "embedding": emb_list,
-+                "sample_id": mem.get("sample_id"),
-+                "round_index": mem.get("round_index"),
-+                "timestamp": mem.get("timestamp"),
-+                "original_messages": mem.get("original_messages"),
-+            }
-+
-+            unique_similar_memories.append(full_mem)
-+
-+        return unique_similar_memories
-+
-+    def _cluster_memories(self, memories, threshold=0.95):
-+        """对记忆进行聚类"""
++    def _cluster_memories_by_embedding(self, memories: List[Dict], threshold: float = 0.95) -> List[List[Dict]]:
 +        if not memories:
 +            return []
 +
++        # 确保所有记忆有 embedding
++        for mem in memories:
++            if "embedding" not in mem:
++                emb = self.embedding_model.embed(mem["text"], "search")
++                mem["embedding"] = np.array(emb, dtype=np.float32)
++
 +        clusters = []
-+        embeddings = [np.array(m.get("embedding"), dtype=np.float32).reshape(-1) for m in memories if m.get("embedding")]
++        used = [False] * len(memories)
 +
-+        for i, memory in enumerate(memories):
-+            if not memory.get("embedding"):
++        for i, mem_i in enumerate(memories):
++            if used[i]:
 +                continue
-+            current_embedding = embeddings[i]
-+            assigned = False
++            cluster = [mem_i]
++            used[i] = True
++            emb_i = mem_i["embedding"]
 +
-+            for cluster in clusters:
-+                cluster_embeddings = [np.array(m.get("embedding"), dtype=np.float32).reshape(-1) for m in cluster if m.get("embedding")]
-+                similarities = [_cosine_similarity(current_embedding, emb) for emb in cluster_embeddings]
++            for j in range(i + 1, len(memories)):
++                if used[j]:
++                    continue
++                emb_j = memories[j]["embedding"]
++                sim = _cosine_similarity(emb_i, emb_j)
++                if sim >= threshold:
++                    cluster.append(memories[j])
++                    used[j] = True
 +
-+                if any(sim >= threshold for sim in similarities):
-+                    cluster.append(memory)
-+                    assigned = True
-+                    break
-+
-+            if not assigned:
-+                clusters.append([memory])
-+
++            clusters.append(cluster)
 +        return clusters
 +
-+
-+    def _process_cluster(self, cluster):
-+        """处理单个聚类"""
-+        if len(cluster) == 1:
-+            return [cluster[0]]
-+        else:
-+            last_item = cluster[-1]
-+            other_items = cluster[:-1]
-+
-+            other_summaries = [item["summary"] for item in other_items]
-+            last_summary = last_item["summary"]
-+
-+            system_prompt = "你是一个专业的记忆整理助手，负责对相似的记忆进行增删改操作。"
-+            user_prompt = f'''
-+你将收到一组相似的记忆片段，请根据以下规则进行处理：
-+- 如果记忆内容重复或相似，进行合并
-+- 如果新记忆包含了旧记忆的补充信息，请合并
-+- 如果记忆内容冲突，请保留最新或更准确的信息
-+- 如果记忆内容可以独立存在，请保留
-+- 如果没有新记忆产生，请输出相似记忆片段和新记忆片段
-+
-+请输出处理后的记忆列表，格式为JSON：
-+{{
-+  "updated_memories": [
-+    {{"summary": "处理后的记忆摘要1"}},
-+    {{"summary": "处理后的记忆摘要2"}}
-+  ]
-+}}
-+
-+相似记忆片段：
-+{other_summaries}
-+
-+新记忆片段：
-+{last_summary}
-+'''.strip()
-+
-+            try:
-+                response = self.llm_client.chat.completions.create(
-+                    model=self.llm_model,
-+                    messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
-+                    response_format={"type": "json_object"},
-+                    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-+                    timeout=30
-+                ).choices[0].message.content
-+
-+
-+                try:
-+                    result = json.loads(response)
-+                    updated_summaries = [item["summary"] for item in result.get("updated_memories", [])]
-+
-+                    updated_items = []
-+                    for summary in updated_summaries:
-+                        embedding_response = self.emb_client.embeddings.create(
-+                            model=self.emb_model,
-+                            input=summary
-+                        )
-+                        messages_embeddings = embedding_response.data[0].embedding
-+                        updated_item = {
-+                            "summary": summary,
-+                            "embedding": messages_embeddings,
-+                            "sample_id": last_item.get("sample_id"),
-+                            "original_messages": last_item.get("original_messages"),
-+                            "round_index": last_item.get("round_index"),
-+                            "timestamp": datetime.now(pytz.UTC).isoformat()
-+                        }
-+                        updated_items.append(updated_item)
-+
-+                    return updated_items
-+                except Exception as e:
-+                    logger.error(f"Failed to parse LLM response: {e}")
-+                    return cluster
-+            except Exception as e:
-+                logger.error(f"Failed to process cluster with LLM: {e}")
-+                return cluster
-+
-+    def _flush_buffer(self, sample_id):
-+        """清空指定 sample_id 的 buffer 并处理其中的数据"""
-+        if sample_id not in self.events_buffer or not self.events_buffer[sample_id]:
++    def _flush_buffer(self, buffer_key: str):
++        if buffer_key not in self.memory_buffer:
++            return
++        buffer_items = self.memory_buffer[buffer_key]
++        if not buffer_items:
 +            return
 +
-+        # 1. 收集 buffer 中的新记忆和相似记忆
-+        new_mem_only = [item["new_memory"] for item in self.events_buffer[sample_id]]
-+        all_similar_memories = []
-+        for buffer_item in self.events_buffer[sample_id]:
-+            all_similar_memories.extend(buffer_item.get("similar_memory", []))
++        logger.info(f"Flushing buffer {buffer_key} with {len(buffer_items)} items")
 +
-+        combined_memories = all_similar_memories + new_mem_only
-+
-+        deduplicated_memories = []
-+        for mem in combined_memories:
-+            if mem not in deduplicated_memories:
-+                deduplicated_memories.append(mem)
-+
-+        combined_memories = deduplicated_memories
-+
-+        if not combined_memories:
-+            del self.events_buffer[sample_id]
-+            return
-+        # 2. 聚类
-+        clusters = self._cluster_memories(combined_memories, self.similarity_threshold)
-+
-+        # 3. 处理每个聚类（调用 LLM 生成更新后的摘要）
-+        processed_memories = []
-+        for cluster in clusters:
-+            processed_cluster = self._process_cluster(cluster)
-+            processed_memories.extend(processed_cluster)
-+
-+        if not processed_memories:
-+            del self.events_buffer[sample_id]
-+            return
-+
-+        # 4. 写入 FAISS（按 sample_id + "events" 分区）
-+        dim = len(processed_memories[0]["embedding"])
-+        self._load_or_create_index(sample_id, "events", dim=dim)
-+
-+        index = self.faiss_store[sample_id]["events"]
-+        meta_list = self.metadata_store[sample_id]["events"]
-+
-+        # 获取文件锁（用于磁盘写入互斥）
-+        file_lock = self._get_file_lock(sample_id)
-+        with file_lock:
-+            # 添加到 FAISS 索引 & metadata list
-+            for mem in processed_memories:
-+                emb = np.array(mem["embedding"], dtype=np.float32)
-+                emb = emb / np.linalg.norm(emb)  # 归一化（FAISS IndexFlatIP 要求）
-+                index.add(emb.reshape(1, -1))
-+                meta_list.append({
-+                    "summary": mem["summary"],
-+                    "sample_id": mem["sample_id"],
-+                    "round_index": mem.get("round_index"),
-+                    "timestamp": mem["timestamp"],
-+                    "original_messages": mem.get("original_messages")
-+                })
-+
-+            # 持久化到磁盘
-+            self._save_faiss_index(sample_id, "events")
-+
-+        logger.info(f"Flushed {len(processed_memories)} memories to FAISS for sample_id: {sample_id}")
-+        # 清空该 sample_id 的 buffer
-+        del self.events_buffer[sample_id]
-+
-+    def _process_single_round(self, idx, msgs, all_rounds, user_list, sample_id):
-+        """处理单个对话轮次"""
-+        parsed_messages = parse_messages(msgs)
-+        event_chunk_size = 3
-+        person_chunk_size = 3
-+        context_start_idx = max(0, idx - event_chunk_size)
-+        person_context_start_idx = max(0, idx - person_chunk_size)
-+        context_messages = all_rounds[context_start_idx:idx]
-+        context_messages_person = all_rounds[person_context_start_idx:idx]
-+
-+        context_messages_str = "".join(parse_messages(round_message) for round_message in context_messages)
-+        context_messages_person_str = "".join(parse_messages(round_message) for round_message in context_messages_person)
-+
-+        system_prompt, user_prompt = get_recent_messages_prompt(parsed_messages, context_messages_str)
-+        system_prompt_u1, user_prompt_u1 = get_person_prompt(parsed_messages, context_messages_person_str, user_list[0])
-+        system_prompt_u2, user_prompt_u2 = get_person_prompt(parsed_messages, context_messages_person_str, user_list[1])
-+
-+        @retry(
-+            stop=stop_after_attempt(3),
-+            wait=wait_exponential(multiplier=1, min=4, max=10),
-+            retry=retry_if_exception_type((openai.APIError, openai.APIConnectionError, openai.RateLimitError, openai.Timeout, TimeoutError)),
-+            reraise=True
-+        )
-+        def call_llm_with_retry(s_prompt, u_prompt):
-+            """带重试机制的LLM调用"""
-+            return self.llm_client.chat.completions.create(
-+                model=self.llm_model,
-+                messages=[{"role": "system", "content": s_prompt}, {"role": "user", "content": u_prompt}],
-+                # response_format={"type": "json_object"},
-+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-+                timeout=30
-+            ).choices[0].message.content
-+
-+        try:
-+            response = call_llm_with_retry(system_prompt, user_prompt)
-+            response_u1 = call_llm_with_retry(system_prompt_u1, user_prompt_u1)
-+            response_u2 = call_llm_with_retry(system_prompt_u2, user_prompt_u2)
-+        except Exception as e:
-+            logger.error(f"Failed to generate summary for round {idx}: {str(e)}")
-+            return None, None, None
-+
-+        try:
-+            new_retrieved_facts = extract_events_from_text(response or "")
-+        except Exception as e:
-+            logger.error(f"Error in new_retrieved_facts for round {idx}: {e}")
-+            new_retrieved_facts = []
-+        try:
-+            new_user1_facts = extract_events_from_text(response_u1 or "")
-+        except Exception as e:
-+            logger.error(f"Error in new_user1_facts for round {idx}: {e}")
-+            new_user1_facts = []
-+        try:
-+            new_user2_facts = extract_events_from_text(response_u2 or "")
-+        except Exception as e:
-+            logger.error(f"Error in new_user2_facts for round {idx}: {e}")
-+            new_user2_facts = []
-+
-+
-+        new_buffer_memories = []
-+        for new_mem in new_retrieved_facts:
-+            embedding_response = self.emb_client.embeddings.create(
-+                model = self.emb_model,
-+                input = new_mem
-+            )
-+            messages_embeddings = embedding_response.data[0].embedding
-+            memory_data = {
-+                "summary": new_mem,
-+                "embedding": messages_embeddings ,
-+                "sample_id": sample_id,
-+                "original_messages": msgs,
-+                "round_index": idx,
-+                "timestamp": datetime.now(pytz.UTC).isoformat()
-+            }
-+
-+            similar_memories = self._find_similar_memories(
-+                messages_embeddings, sample_id, self.similarity_threshold
-+            )
-+
-+            new_buffer_memories.append({
-+                "new_memory": memory_data,
-+                "similar_memory": similar_memories
++        all_candidate_memories = []
++        existing_memories_set = {}
++        for item in buffer:
++            all_candidate_memories.append({
++                "text": item["new_memory"],
++                "is_new": True,
++                "source": "new"
 +            })
 +
-+        all_person_memory_1 = []
-+        all_person_memory_2 = []
-+        for new_mem_u1 in new_user1_facts:
-+            embedding_response = self.emb_client.embeddings.create(
-+                model = self.emb_model,
-+                input = new_mem_u1
++            for mem in similary_memories:
++                text = mem.text
++                if text and text not in existing_memories_set:
++                    existing_memories_set[text] = {
++                        "text": text,
++                        "is_new": False,
++                        "source": "existing",
++                        "id": mem.id
++                    }
++        
++        all_memories = all_candidate_memories + list(existing_memories_set.values())
++        clusters = self._cluster_memories_by_embedding(all_memories, threshold=self.similarity_threshold)
++        for cluster in clusters:
++            new_in_cluster = [m for m in cluster if m["is_new"]]
++            old_in_cluster = [m for m in cluster if not m["is_new"]]
++
++            if not new_in_cluster:
++                continue  # 全是旧记忆，跳过
++
++            new_summaries = list({m["text"] for m in new_in_cluster})
++            old_summaries = list({m["text"] for m in old_in_cluster})
++
++            # 构造融合 prompt
++            system_prompt, user_prompt = get_update_memory_prompt(
++                new_memory="；".join(new_summaries),
++                similar_memories=old_summaries
 +            )
-+            messages_embeddings = embedding_response.data[0].embedding
-+            memory_data = {
-+                "summary": new_mem_u1,
-+                "user": user_list[0],
-+                "embedding": messages_embeddings ,
-+                "sample_id": sample_id,
-+                "original_messages": msgs,
-+                "round_index": idx,
-+                "timestamp": datetime.now(pytz.UTC).isoformat()
-+            }
-+            all_person_memory_1.append(memory_data)
 +
-+        for new_mem_u2 in new_user2_facts:
-+            embedding_response = self.emb_client.embeddings.create(
-+                model = self.emb_model,
-+                input = new_mem_u2
-+            )
-+            messages_embeddings = embedding_response.data[0].embedding
-+            memory_data = {
-+                "summary": new_mem_u2,
-+                "user": user_list[1],
-+                "embedding": messages_embeddings ,
-+                "sample_id": sample_id,
-+                "original_messages": msgs,
-+                "round_index": idx,
-+                "timestamp": datetime.now(pytz.UTC).isoformat()
-+            }
-+            all_person_memory_2.append(memory_data)
++            try:
++                response = self.llm.generate_response(
++                    messages=[
++                        {"role": "system", "content": system_prompt},
++                        {"role": "user", "content": user_prompt}
++                    ],
++                    response_format={"type": "json_object"},
++                    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
++                )
 +
-+        return new_buffer_memories, all_person_memory_1, all_person_memory_2
++                result = json.loads(response)
++                stored_summaries = [item["summary"] for item in result.get("stored_memories", [])]
++            except Exception as e:
++                logger.error(f"LLM fusion failed for cluster: {e}")
++                stored_summaries = new_summaries  # fallback
 +
++            # 写入向量库（ADD）
++            for summary in stored_summaries:
++                if not summary.strip():
++                    continue
++                memory_id = self._create_memory(data=summary,existing_embeddings={}, metadata={})
++                returned_memories.append({"id": memory_id, "memory": summary, "event": "ADD"})
 +
++        logger.info(f"Added {len(returned_memories)} fused memories from {len(clusters)} clusters")
++
++        # 清空 buffer
++        self.memory_buffer[buffer_key].clear()
++        return returned_memories
 +
 +    def add(
 +        self,
@@ -558,6 +243,7 @@ index 0000000..af78f46
 +        infer: bool = True,
 +        memory_type: Optional[str] = None,
 +        prompt: Optional[str] = None,
++        batch: bool = False,
 +    ):
 +        """
 +        Create a new memory.
@@ -597,117 +283,228 @@ index 0000000..af78f46
 +            DatabaseError: If database operations fail.
 +        """
 +
-+        if not self.telemem_feature:
-+            return super().add(messages, user_id=user_id, agent_id=agent_id, run_id=run_id, metadata=metadata, infer=infer, memory_type=memory_type, prompt=prompt)
++        if batch:
++            return self.add_batch(
++                messages=messages,
++                user_id=user_id,
++                agent_id=agent_id,
++                run_id=run_id,
++                metadata=metadata,
++                infer=infer,
++                memory_type=memory_type,
++                prompt=prompt,
++            )
 +
-+        sample_id = metadata.get("sample_id") if metadata and isinstance(metadata, dict) else None
-+        user_list = metadata.get("user") if metadata and isinstance(metadata, dict) else None
-+        merged_messages = merge_consecutive_messages(messages)
++        if isinstance(messages, str):
++            messages = [{"role": "user", "content": messages}]
 +
-+        rounds = []
-+        i = 0
-+        while i < len(merged_messages) - 1:
-+            if merged_messages[i]["role"] == "user" and merged_messages[i + 1]["role"] == "assistant":
-+                rounds.append([merged_messages[i], merged_messages[i + 1]])
-+                i += 2
-+            elif merged_messages[i]["role"] == "assistant" and merged_messages[i + 1]["role"] == "user":
-+                i += 1
-+            else:
-+                i += 1
++        elif isinstance(messages, dict):
++            messages = [messages]
 +
-+        if len(rounds) == 0:
-+            logger.warning("No valid user-assistant message pairs found after merging. No memory added.")
-+            return {"results": []}
++        elif not isinstance(messages, list):
++            raise Mem0ValidationError(
++                message="messages must be str, dict, or list[dict]",
++                error_code="VALIDATION_003",
++                details={"provided_type": type(messages).__name__, "valid_types": ["str", "dict", "list[dict]"]},
++                suggestion="Convert your input to a string, dictionary, or list of dictionaries."
++            )
 +
-+        all_person_memory_1 = []
-+        all_person_memory_2 = []
++        filters = {}
++        if metadata is None:
++            metadata = {}
++        if user_id:
++            metadata["user_id"] = user_id
++            filters["user_id"] = user_id
 +
-+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
-+            future_to_idx = {
-+                executor.submit(self._process_single_round, idx, rounds[idx], rounds, user_list, sample_id): idx
-+                for idx in range(len(rounds))
-+            }
++        if agent_id:
++            metadata["agent_id"] = agent_id
++            filters["agent_id"] = agent_id
 +
-+            # print(f"Submitted {len(future_to_idx)} tasks.")
-+            for future in tqdm(
-+                    concurrent.futures.as_completed(future_to_idx),
-+                    total=len(future_to_idx),
-+                    desc="Processing rounds",
-+                    unit="round"
-+                ):
-+                idx = future_to_idx[future]
-+                try:
-+                    buffer_item, person_memories_1, person_memories_2 = future.result()
-+                    if buffer_item is None:
-+                        continue
++        if run_id:
++            metadata["run_id"] = run_id
++            filters["run_id"] = run_id
 +
-+                    buffer_lock = self._get_buffer_lock(sample_id)
-+                    with buffer_lock:
-+                        if sample_id not in self.events_buffer:
-+                            self.events_buffer[sample_id] = []
++        mem_buffer = self._extract_summary_from_messages(user_id, messages, metadata, filters, infer)
++        returned_memories = self._sync_memory_to_vector_store(mem_buffer, metadata, filters, infer)
 +
-+                        for new_buffer in buffer_item:
-+                            self.events_buffer[sample_id].append(new_buffer)
++    def add_batch(
++        self,
++        messages,
++        *,
++        user_id: Optional[str] = None,
++        agent_id: Optional[str] = None,
++        run_id: Optional[str] = None,
++        metadata: Optional[Dict[str, Any]] = None,
++        infer: bool = True,
++        memory_type: Optional[str] = None,
++        prompt: Optional[str] = None,
++    ):
++        """
++        Batch create a new memory.
 +
-+                        if len(self.events_buffer[sample_id]) >= self.buffer_size:
-+                            # print(f"sample_id {sample_id} 的缓冲区达到阈值 {self.buffer_size}，开始刷新...")
-+                            self._flush_buffer(sample_id) # 在锁内调用 flush
++        Adds new memories scoped to a single session id (e.g. `user_id`, `agent_id`, or `run_id`). One of those ids is required.
 +
-+                    all_person_memory_1.extend(person_memories_1)
-+                    all_person_memory_2.extend(person_memories_2)
++        Args:
++            messages (str or List[Dict[str, str]]): The message content or list of messages
++                (e.g., `[{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi"}]`)
++                to be processed and stored.
++            user_id (str, optional): ID of the user creating the memory. Defaults to None.
++            agent_id (str, optional): ID of the agent creating the memory. Defaults to None.
++            run_id (str, optional): ID of the run creating the memory. Defaults to None.
++            metadata (dict, optional): Metadata to store with the memory. Defaults to None.
++            infer (bool, optional): If True (default), an LLM is used to extract key facts from
++                'messages' and decide whether to add, update, or delete related memories.
++                If False, 'messages' are added as raw memories directly.
++            memory_type (str, optional): Specifies the type of memory. Currently, only
++                `MemoryType.PROCEDURAL.value` ("procedural_memory") is explicitly handled for
++                creating procedural memories (typically requires 'agent_id'). Otherwise, memories
++                are treated as general conversational/factual memories.memory_type (str, optional): Type of memory to create. Defaults to None. By default, it creates the short term memories and long term (semantic and episodic) memories. Pass "procedural_memory" to create procedural memories.
++            prompt (str, optional): Prompt to use for the memory creation. Defaults to None.
 +
-+                except Exception as e:
-+                    logger.error(f"Error processing round {idx}: {e}")
 +
-+        buffer_lock_final = self._get_buffer_lock(sample_id)
-+        with buffer_lock_final:
-+            if sample_id in self.events_buffer and self.events_buffer[sample_id]:
-+                # print(f"循环结束，刷新 sample_id {sample_id} 的剩余缓冲区...")
-+                self._flush_buffer(sample_id)
++        Returns:
++            dict: A dictionary containing the result of the memory addition operation, typically
++                  including a list of memory items affected (added, updated) under a "results" key,
++                  and potentially "relations" if graph store is enabled.
++                  Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "event": "ADD"}]}`
++
++        Raises:
++            Mem0ValidationError: If input validation fails (invalid memory_type, messages format, etc.).
++            VectorStoreError: If vector store operations fail.
++            GraphStoreError: If graph store operations fail.
++            EmbeddingError: If embedding generation fails.
++            LLMError: If LLM operations fail.
++            DatabaseError: If database operations fail.
++        """
++
++        if isinstance(messages, dict):
++            messages = [messages]
++
++        elif not isinstance(messages, list):
++            raise Mem0ValidationError(
++                message="messages must dict, or list[dict]",
++                error_code="VALIDATION_003",
++                details={"provided_type": type(messages).__name__, "valid_types": ["str", "dict", "list[dict]"]},
++                suggestion="Convert your input to a dictionary, or list of dictionaries."
++            )
 +
 +
-+        store_dir = self.faiss_dir
++        buffer_key = self._get_buffer_key(run_id, user_id)
++        buffer_lock = self._get_buffer_lock(buffer_key)
 +
-+        for key in ["person_1", "person_2"]:
-+            self._load_or_create_index(sample_id, key, dim=len(all_person_memory_1[0]["embedding"]) if all_person_memory_1 else 1024)
++        with buffer_lock:
++            if buffer_key not in self.memory_buffer:
++                self.memory_buffer[buffer_key] = []
 +
-+       # === 添加 person_1 memories ===
-+        index_u1 = self.faiss_store[sample_id]["person_1"]
-+        meta_u1 = self.metadata_store[sample_id]["person_1"]
-+        for mem in all_person_memory_1:
-+            emb = np.array(mem["embedding"], dtype=np.float32)
-+            emb = emb / np.linalg.norm(emb)
-+            index_u1.add(emb.reshape(1, -1))
-+            meta_u1.append({
-+                "summary": mem["summary"],
-+                "user": mem["user"],
-+                "sample_id": mem["sample_id"],
-+                "original_messages": mem["original_messages"],
-+                "round_index": mem["round_index"],
-+                "timestamp": mem["timestamp"]
++            for msgs in messages:
++                mem_buffer = self._extract_summary_from_messages(user_id, msgs, metadata, filters, infer)
++                self.memory_buffer[buffer_key].extend(mem_buffer)
++
++                if len(self.memory_buffer[buffer_key]) >= self.buffer_size:
++                    self._flush_buffer(buffer_key)
++            
++            self._flush_buffer(buffer_key)
++
++        
++
++    def _extract_summary_from_messages(self, user_id, messages, metadata, filters, infer):
++        # print(messages[0:-1])
++        parsed_messages = parse_messages(messages[-1:])
++        context_messages = parse_messages(messages[0:-1])
++        if user_id is None:
++            system_prompt, user_prompt = get_recent_messages_prompt(parsed_messages, context_messages)
++        else:
++            system_prompt, user_prompt = get_person_prompt(parse_messages, context_messages, user_id)
++        
++        response = self.llm.generate_response(
++            messages=[
++                {"role": "system", "content": system_prompt},
++                {"role": "user", "content": user_prompt},
++            ],
++            # response_format={"type": "json_object"},
++            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
++        )
++        print(response)
++        try:
++            new_extracted_summaries = extract_events_from_text(response or "")
++        except Exception as e:
++            logger.error(f"Error in new_extracted_summaries: {e}")
++            new_extracted_summaries = []
++
++        # retrieved_old_memory = []
++        new_message_embeddings = {}
++        mem_buffer = []
++
++        search_filters = {}
++        if filters.get("user_id"):
++            search_filters["user_id"] = filters["user_id"]
++        if filters.get("agent_id"):
++            search_filters["agent_id"] = filters["agent_id"]
++        if filters.get("run_id"):
++            search_filters["run_id"] = filters["run_id"]
++
++        for new_mem in new_extracted_summaries:
++            retrieved_old_memory = []
++            existing_memories = self._search_vector_store(
++                query=new_mem,
++                filters=search_filters,
++                limit=5,
++                threshold=self.similarity_threshold
++            )
++            for mem in existing_memories:
++                retrieved_old_memory.append({"id": mem.id, "text": mem.payload.get("data", "")})
++
++            # mapping UUIDs with integers for handling UUID hallucinations
++            temp_uuid_mapping = {}
++            for idx, item in enumerate(retrieved_old_memory):
++                temp_uuid_mapping[str(idx)] = item["id"]
++                retrieved_old_memory[idx]["id"] = str(idx)
++
++            mem_buffer.append({
++                "new_memory" : new_mem,
++                "similary_memories" : retrieved_old_memory
 +            })
++        
++        return mem_buffer
 +
-+        # === 添加 person_2 memories ===
-+        index_u2 = self.faiss_store[sample_id]["person_2"]
-+        meta_u2 = self.metadata_store[sample_id]["person_2"]
-+        for mem in all_person_memory_2:
-+            emb = np.array(mem["embedding"], dtype=np.float32)
-+            emb = emb / np.linalg.norm(emb)
-+            index_u2.add(emb.reshape(1, -1))
-+            meta_u2.append({
-+                "summary": mem["summary"],
-+                "user": mem["user"],
-+                "sample_id": mem["sample_id"],
-+                "original_messages": mem["original_messages"],
-+                "round_index": mem["round_index"],
-+                "timestamp": mem["timestamp"]
-+            })
 +
-+        # === 保存 FAISS 索引和元数据 ===
-+        self._save_faiss_index(sample_id, "person_1")
-+        self._save_faiss_index(sample_id, "person_2")
++    def _sync_memory_to_vector_store(self, mem_buffer, metadata, filters, infer):
 +
-+        return
++        returned_memories = []
++        for mem_item in mem_buffer:
++            new_memory = mem_item["new_memory"]
++            similary_memories = mem_item["similary_memories"]
++            similary_memories_text = [mem["text"] for mem in similary_memories]
++
++            system_prompt, user_prompt = get_update_memory_prompt(new_memory, similary_memories_text)
++
++            try:
++                response = self.llm.generate_response(
++                    messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
++                    response_format={"type": "json_object"},
++                    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
++                )
++            except Exception as e:
++                logger.error(f"Error in new memory actions response: {e}")
++                response = ""
++
++            try:
++                result = json.loads(response)
++                returnd_memories = [item["summary"] for item in result.get("stored_memories", [])]
++
++            except Exception as e:
++                logger.error(f"Invalid JSON response: {e}")
++                returnd_memories = []
++
++            for mem in returnd_memories:
++                memory_id = self._create_memory(
++                    data = mem,
++                    existing_embeddings={},
++                    metadata=deepcopy(metadata)
++                )
++
++        return returned_memories
++
 +    def search(
 +        self,
 +        query: str,
@@ -715,7 +512,7 @@ index 0000000..af78f46
 +        user_id: Optional[str] = None,
 +        agent_id: Optional[str] = None,
 +        run_id: Optional[str] = None,
-+        limit: int = 5,
++        limit: int = 100,
 +        filters: Optional[Dict[str, Any]] = None,
 +        threshold: Optional[float] = None,
 +        rerank: bool = True,
@@ -726,14 +523,14 @@ index 0000000..af78f46
 +            query (str): Query to search for.
 +            user_id (str, optional): ID of the user to search for. Defaults to None.
 +            agent_id (str, optional): ID of the agent to search for. Defaults to None.
-+            run_id (str, optional): ID of the sample to search for. Defaults to None.
++            run_id (str, optional): ID of the run to search for. Defaults to None.
 +            limit (int, optional): Limit the number of results. Defaults to 100.
 +            filters (dict, optional): Legacy filters to apply to the search. Defaults to None.
 +            threshold (float, optional): Minimum score for a memory to be included in the results. Defaults to None.
 +            filters (dict, optional): Enhanced metadata filtering with operators:
 +                - {"key": "value"} - exact match
 +                - {"key": {"eq": "value"}} - equals
-+                - {"key": {"ne": "value"}} - not equals
++                - {"key": {"ne": "value"}} - not equals  
 +                - {"key": {"in": ["val1", "val2"]}} - in list
 +                - {"key": {"nin": ["val1", "val2"]}} - not in list
 +                - {"key": {"gt": 10}} - greater than
@@ -753,61 +550,27 @@ index 0000000..af78f46
 +                  Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
 +        """
 +
-+        if not self.telemem_feature:
-+            return super().search(query, user_id=user_id, agent_id=agent_id, run_id=run_id, limit=limit, filters=filters, threshold=threshold, rerank=rerank)
++        original_memories = self._search_vector_store(
++            query, filters, limit, threshold
++        )
 +
-+        if not run_id:
-+            raise ValueError("run_id is required for search operation")
++        if rerank and self.reranker and original_memories:
++            try:
++                reranked_memories = self.reranker.rerank(query, original_memories, limit)
++                original_memories = reranked_memories
++            except Exception as e:
++                logger.warning(f"Reranking failed, using original results: {e}")
 +
-+        try:
-+            query_embedding_response = self.emb_client.embeddings.create(
-+                model=self.emb_model,
-+                input=query
-+            )
-+            query_embedding = np.array(query_embedding_response.data[0].embedding, dtype=np.float32)
-+            query_embedding = query_embedding / np.linalg.norm(query_embedding)
-+        except Exception as e:
-+            raise Exception(f"Failed to generate query embedding: {str(e)}")
++        return {"results": original_memories}
 +
-+        for key in ["events", "person_1", "person_2"]:
-+            self._load_or_create_index(run_id, key)
-+
-+        results = {"events": [], "person_1": [], "person_2": [], "combined": []}
-+        def _search_in_index(key, lim):
-+            index = self.faiss_store[run_id][key]
-+            metadata = self.metadata_store[run_id][key]
-+            if index.ntotal == 0:
-+                return []
-+            D, I = index.search(query_embedding.reshape(1, -1), lim)
-+            res = []
-+            for i, score in zip(I[0], D[0]):
-+                if i == -1:
-+                    continue
-+                if threshold is not None and score < threshold:
-+                    continue
-+                res.append(metadata[i]["summary"])
-+            return res
-+
-+        results["events"] = _search_in_index("events", limit)
-+        results["person_1"] = _search_in_index("person_1", limit)
-+        results["person_2"] = _search_in_index("person_2", limit)
-+        # results["combined"] = results["events"] + results["person_1"] + results["person_2"]
-+        # results["combined"] = results["events"]
-+        results["combined"] = results["person_1"] + results["person_2"]
-+
-+        return " ".join(results["combined"])
-+
-+    # ########### multi modal memory ###########
 +
 +    def add_mm(
 +        self,
 +        video_path: str,
-+        *,
-+        frames_root: str = "video/frames",
-+        captions_root: str = "video/captions",
-+        vdb_root: str = "video/vdb",
-+        clip_secs: int = None,
-+        emb_dim: int = None,
++        output_dir: str,
++        # *,
++        clip_secs: int | None = None,
++        emb_dim: int | None = None,
 +        subtitle_path: str | None = None,
 +    ):
 +        """
@@ -816,13 +579,16 @@ index 0000000..af78f46
 +        2) process_video          -> captions.json
 +        3) init_single_video_db   -> *_vdb.json
 +
++        All generated artifacts are placed under `output_dir`:
++        - frames:   {output_dir}/frames/<video_name>/frames
++        - captions: {output_dir}/captions/<video_name>/captions.json
++        - vdb:      {output_dir}/vdb/<video_name>/<video_name>_vdb.json
++
 +        If target files/directories already exist at any stage, skip that stage and continue.
 +
 +        Args:
 +            video_path: Path to the source video file, e.g., "video/3EQLFHRHpag.mp4"
-+            frames_root: Root directory for frame output, e.g., "video/frames"
-+            captions_root: Root directory for captions.json output, e.g., "video/captions"
-+            vdb_root: Root directory for vdb.json output, e.g., "video/vdb"
++            output_dir: Root directory to hold frames/captions/vdb subfolders
 +            clip_secs: Optional, if not None, overrides config.CLIP_SECS
 +            emb_dim: Optional, if not None, used as embedding dimension for init_single_video_db;
 +                     if None, reads from config.LOCAL_EMBEDDING_LARGE_DIM
@@ -833,16 +599,17 @@ index 0000000..af78f46
 +        video_name = os.path.splitext(os.path.basename(video_abs))[0]
 +
 +        # 2. Construct directory/file paths for each level
-+        frames_root_abs = os.path.abspath(os.path.join(BASE_DIR, frames_root))
-+        captions_root_abs = os.path.abspath(os.path.join(BASE_DIR, captions_root))
-+        vdb_root_abs = os.path.abspath(os.path.join(BASE_DIR, vdb_root))
++        output_dir_abs = os.path.abspath(os.path.join(BASE_DIR, output_dir))
++        frames_root_abs = os.path.join(output_dir_abs, "frames")
++        captions_root_abs = os.path.join(output_dir_abs, "captions")
++        vdb_root_abs = os.path.join(output_dir_abs, "vdb")
 +
-+
++        
 +        video_frames_dir = os.path.join(frames_root_abs, video_name, "frames")
-+
++        
 +        video_caption_dir = os.path.join(captions_root_abs, video_name)
 +        caption_json_path = os.path.join(video_caption_dir, "captions.json")
-+
++        
 +        video_vdb_dir = os.path.join(vdb_root_abs, video_name)
 +        vdb_json_path = os.path.join(video_vdb_dir, f"{video_name}_vdb.json")
 +
@@ -862,6 +629,7 @@ index 0000000..af78f46
 +            decode_video_to_frames(
 +                video_path=video_abs,
 +                frames_dir=video_frames_dir,
++                cfg=self.config.vlm,
 +            )
 +
 +        # ---------------- ② process_video -> captions.json --------
@@ -870,65 +638,78 @@ index 0000000..af78f46
 +        else:
 +            logger.info(f"[add_mm] Captioning frames -> {caption_json_path}")
 +            os.makedirs(video_caption_dir, exist_ok=True)
-+
++            
 +            # if clip_secs is not None:
-+            #     import config as _cfg
-+            #     _cfg.CLIP_SECS = clip_secs  # Simple override, takes effect globally
++            # 
++            #     self.config.CLIP_SECS = clip_secs  # Simple override, takes effect globally
 +
 +            process_video(
 +                frame_folder=video_frames_dir,
 +                output_caption_folder=video_caption_dir,
 +                subtitle_file_path=subtitle_path,
++                cfg=self.config.vlm,
 +            )
 +
-+        # ---------------- ③ init_single_video_db -> vdb.json ------
++        # ---------------- ③ init_single_video_db -> vdb.json ------ 
 +        if os.path.isfile(vdb_json_path):
 +            logger.info(f"[add_mm] Skip building VDB: {vdb_json_path} already exists")
 +        else:
 +            logger.info(f"[add_mm] Building VDB -> {vdb_json_path}")
 +            os.makedirs(video_vdb_dir, exist_ok=True)
-+            # import config as _cfg
-+            dim = emb_dim if emb_dim is not None else self.emb_dim
++            dim = emb_dim if emb_dim is not None else self.config.vlm["emb_dim"]
 +
 +            init_single_video_db(
 +                video_caption_json_path=caption_json_path,
 +                output_video_db_path=vdb_json_path,
 +                emb_dim=dim,
++                cfg=self.config.vlm,
 +            )
 +
 +        return {
-+            "video_name": video_name,
-+            "frames_dir": video_frames_dir,
-+            "caption_json": caption_json_path,
-+            "vdb_json": vdb_json_path,
++            "output_dir": output_dir_abs,
 +        }
-+
-+
 +
 +    def search_mm(
 +        self,
 +        question: str,
-+        video_db_path: str = "video/vdb/3EQLFHRHpag_vdb.json",
-+        video_caption_path: str = "video/captions/captions.json",
++        output_dir: str,
 +        max_iterations: int = 15,
 +    ):
 +        """
-+        Multimodal memory search: Invokes MMCoreAgent to perform reasoning on a given video and multiple-choice question.
++        Multimodal memory search using artifacts produced by `add_mm`.
 +
 +        Args:
-+            question: A question string with A/B/C/D options
-+            video_db_path: Path to the video vdb, relative to the telemem_mm directory
-+            video_caption_path: Path to the video caption json, relative to the telemem_mm directory
-+            max_iterations: Maximum number of reasoning iterations for MMCoreAgent
++            question: A question string with A/B/C/D options.
++            output_dir: The same output directory passed to `add_mm`; expected layout:
++                        - {output_dir}/captions/<video_name>/captions.json
++                        - {output_dir}/vdb/<video_name>/<video_name>_vdb.json
++            max_iterations: Maximum number of reasoning iterations for MMCoreAgent.
 +
 +        Returns:
 +            messages: List of messages returned by MMCoreAgent.run(question)
 +        """
 +
++        output_dir_abs = os.path.abspath(os.path.join(BASE_DIR, output_dir))
++
++        captions_root = os.path.join(output_dir_abs, "captions")
++        vdb_root = os.path.join(output_dir_abs, "vdb")
++
++        caption_candidates = list(Path(captions_root).glob("*/captions.json"))
++        vdb_candidates = list(Path(vdb_root).glob("*/*_vdb.json"))
++
++        if len(caption_candidates) != 1:
++            raise ValueError(f"Expected exactly one captions.json under {captions_root}, found {len(caption_candidates)}.")
++        if len(vdb_candidates) != 1:
++            raise ValueError(f"Expected exactly one *_vdb.json under {vdb_root}, found {len(vdb_candidates)}.")
++
++        video_caption_path = str(caption_candidates[0])
++        video_db_path = str(vdb_candidates[0])
++
 +        agent = MMCoreAgent(
 +            video_db_path=video_db_path,
 +            video_caption_path=video_caption_path,
 +            max_iterations=max_iterations,
++            cfg=self.config.vlm,
 +        )
 +        messages = agent.run(question)
 +        return messages
@@ -938,14 +719,15 @@ new file mode 100644
 index 0000000..e69de29
 diff --git a/vendor/TeleMem/mm_utils/build_database.py b/vendor/TeleMem/mm_utils/build_database.py
 new file mode 100644
-index 0000000..a012b12
+index 0000000..7417a36
 --- /dev/null
 +++ b/vendor/TeleMem/mm_utils/build_database.py
-@@ -0,0 +1,408 @@
+@@ -0,0 +1,430 @@
++import functools
 +import json
 +import multiprocessing
 +import os
-+from typing import Annotated as A
++from typing import Annotated as A, Optional
 +
 +import numpy as np
 +from nano_vectordb import NanoVectorDB
@@ -953,18 +735,25 @@ index 0000000..a012b12
 +
 +# import config as config
 +from func_call_shema import doc as D
-+from memory_utils import AzureOpenAIEmbeddingService, call_openai_model_with_tools
++from TeleMem.mm_utils.memory_utils import AzureOpenAIEmbeddingService, call_openai_model_with_tools
 +
-+from memory_utils import load_config
++from TeleMem.mm_utils.memory_utils import load_config
 +
 +PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
-+cfg = load_config(os.environ["MM_CONFIG_PATH"])
++
++
++# def _ensure_cfg(cfg: Optional[dict]) -> dict:
++#     """Return provided cfg or load default config if None."""
++#     if cfg is not None:
++#         return cfg
++#     config_path = os.environ.get("MM_CONFIG_PATH") or os.path.join(PARENT_DIR, "config.yaml")
++#     return load_config(config_path)
 +
 +def frame_inspect_tool(
 +    database: A[NanoVectorDB, D("The database containing video metadata. Must be an instance of NanoVectorDB.")], 
 +    question: A[str, D("The specific detailed question to ask about the video content during the specified time ranges. No need to add time ranges in the question.")], 
 +    time_ranges_hhmmss: A[list[tuple], D("A list of tuples containing start and end times in HH:MM:SS format. If the time range is longer than 50 seconds, the function samples 50 evenly distributed frames.  Otherwise, it uses all frames within the specified range.")], 
++    cfg: Optional[dict] = None,
 +) -> str:
 +    """
 +    Crop the video frames based on the time ranges and ask the model a detailed question about the cropped video clips.
@@ -972,6 +761,8 @@ index 0000000..a012b12
 +        str: The model's response to the question. If no relevant content is found within the time range,
 +             returns an error message: "Error: Cannot find corresponding result in the given time range."
 +    """
++
++    # cfg = _ensure_cfg(cfg)
 +
 +    assert isinstance(database, NanoVectorDB), "Database must be an instance of NanoVectorDB"
 +    video_length_secs = convert_hhmmss_to_seconds(database.get_additional_data()['video_length'])
@@ -1049,8 +840,8 @@ index 0000000..a012b12
 +    ]
 +    msgs = call_openai_model_with_tools(
 +        messages=input_msgs,
-+        endpoints=cfg['AOAI_TOOL_VLM_ENDPOINT_LIST'],
-+        model_name=cfg['AOAI_TOOL_VLM_MODEL_NAME'],
++        endpoints=cfg['vlm_client'],# AOAI_TOOL_VLM_ENDPOINT_LIST
++        model_name=cfg['vlm_model'], # AOAI_TOOL_VLM_MODEL_NAME
 +        api_key=cfg['OPENAI_API_KEY'],
 +        image_paths=files,
 +        temperature=0,
@@ -1063,7 +854,8 @@ index 0000000..a012b12
 +def clip_search_tool(
 +        database: A[NanoVectorDB, D("The database object that supports querying with embeddings.")],
 +        event_description: A[str, D("A textual description of the event to search for.")],
-+        top_k: A[int, D("The maximum number of top results to retrieve. Just use the default value.")] = 16
++    top_k: A[int, D("The maximum number of top results to retrieve. Just use the default value.")] = 16,
++    cfg: Optional[dict] = None,
 +) -> str:
 +    """
 +    Searches for events in a video clip database based on a given event description and retrieves the top-k most relevant video clip captions.
@@ -1075,6 +867,8 @@ index 0000000..a012b12
 +        - This function utilizes the OpenAI Embedding Service to generate embeddings for the input text.
 +        - Use default values for `top_k` to limit the number of results returned.
 +    """
++    # cfg = _ensure_cfg(cfg)
++
 +    assert isinstance(database, NanoVectorDB), "Database must be an instance of NanoVectorDB"
 +    query_emb = AzureOpenAIEmbeddingService.get_embeddings(
 +        endpoints=cfg['emb_client'],
@@ -1099,6 +893,7 @@ index 0000000..a012b12
 +def global_browse_tool(
 +        database: A[NanoVectorDB, D("The database object that supports querying with embeddings.")],
 +        query: A[str, D("A textual description which will be used to search for relevant video clips in the database.")],
++    cfg: Optional[dict] = None,
 +) -> str:
 +    """
 +    Analyzes a video database to answer a detailed question by first searching for relevant video clips and then generating a comprehensive answer based on their captions.
@@ -1110,6 +905,8 @@ index 0000000..a012b12
 +    Returns:
 +        str: A JSON string containing the subject registry and the model's answer to the query based on the most relevant video clips.
 +    """
++    # cfg = _ensure_cfg(cfg)
++
 +    # search related clips
 +    assert isinstance(database, NanoVectorDB), "Database must be an instance of NanoVectorDB"
 +    query_emb = AzureOpenAIEmbeddingService.get_embeddings(
@@ -1154,8 +951,8 @@ index 0000000..a012b12
 +
 +    msgs = call_openai_model_with_tools(
 +        messages=input_msgs,
-+        endpoints=cfg['AOAI_TOOL_VLM_ENDPOINT_LIST'],
-+        model_name=cfg['AOAI_TOOL_VLM_MODEL_NAME'],
++        endpoints=cfg['vlm_client'], # AOAI_TOOL_VLM_ENDPOINT_LIST
++        model_name=cfg['vlm_model'], # AOAI_TOOL_VLM_MODEL_NAME
 +        api_key=cfg['OPENAI_API_KEY'],
 +        temperature=0,
 +        max_tokens=512,
@@ -1188,7 +985,8 @@ index 0000000..a012b12
 +    i=sorted((int(a),int(b))for a,b in(map(lambda x:x.split('_'),d)));c=0
 +    return all(s==c and not (c:=e) for s,e in i) and c==N
 +
-+def init_single_video_db(video_caption_json_path, output_video_db_path, emb_dim):
++def init_single_video_db(video_caption_json_path, output_video_db_path, emb_dim, cfg: Optional[dict] = None):
++    # cfg = _ensure_cfg(cfg)
 +    vdb = NanoVectorDB(emb_dim, storage_file=output_video_db_path)
 +    # with open(video_caption_json_path, "r") as f:
 +    #     captions = json.load(f)
@@ -1201,7 +999,7 @@ index 0000000..a012b12
 +    if os.path.exists(output_video_db_path):
 +        print(f"Database {output_video_db_path} already exists.")
 +    else:
-+        cap2emb_list = preprocess_captions(video_caption_json_path)
++        cap2emb_list = preprocess_captions(video_caption_json_path, cfg=cfg)
 +        data = []
 +        for idx, (timestamp, cap, emb) in enumerate(cap2emb_list):
 +            t1 = convert_seconds_to_hhmmss(timestamp[0])
@@ -1231,7 +1029,8 @@ index 0000000..a012b12
 +        vdb.save()
 +    return vdb
 +
-+def preprocess_captions(caption_json_path):
++def preprocess_captions(caption_json_path, cfg: Optional[dict] = None):
++    # cfg = _ensure_cfg(cfg)
 +    with open(caption_json_path, "r") as f:
 +        captions = json.load(f)
 +    scripts = []
@@ -1260,14 +1059,15 @@ index 0000000..a012b12
 +    with multiprocessing.Pool(os.cpu_count() // 2) as pool:
 +        with tqdm(total=len(scripts), desc="Embedding captions...") as pbar:
 +            for result in pool.imap_unordered(
-+                single_batch_embedding_task,
++                functools.partial(single_batch_embedding_task, cfg=cfg),
 +                batched_scripts,
 +            ):
 +                cap2emb_list.extend(result)
 +                pbar.update(len(result))
 +    return cap2emb_list
 +
-+def single_batch_embedding_task(data):
++def single_batch_embedding_task(data, cfg: Optional[dict] = None):
++    # cfg = _ensure_cfg(cfg)
 +    timestamps, captions, cap_infos = map(list, (zip(*data)))
 +    embs = AzureOpenAIEmbeddingService.get_embeddings(
 +        endpoints=cfg['emb_client'],
@@ -1292,6 +1092,8 @@ index 0000000..a012b12
 +    return list(zip(timestamps, cap_infos, [d['embedding'] for d in embs]))
 +
 +if __name__ == "__main__":
++    # cfg = _ensure_cfg(None)
++
 +    # benchmark_metadata_path = "/home/xiaoyizhang/event_prediction_model/LVBench/data/video_info.meta.jsonl"
 +    # video_caption_folder = "/data/xiaoyizhang/LVBench/"
 +    # output_folder_name = "audio_segment_w_transcribe_0411"
@@ -1346,6 +1148,7 @@ index 0000000..a012b12
 +                caption_json_path,
 +                output_video_db_path,
 +                embedding_dim,
++                cfg=cfg,
 +            )
 +            print(f"Done. VDB saved to: {output_video_db_path}")
 +        except Exception as e:
@@ -1353,10 +1156,10 @@ index 0000000..a012b12
 \ No newline at end of file
 diff --git a/vendor/TeleMem/mm_utils/core.py b/vendor/TeleMem/mm_utils/core.py
 new file mode 100644
-index 0000000..ecdd563
+index 0000000..357e674
 --- /dev/null
 +++ b/vendor/TeleMem/mm_utils/core.py
-@@ -0,0 +1,349 @@
+@@ -0,0 +1,350 @@
 +import copy
 +import json
 +from typing import Annotated as A
@@ -1367,7 +1170,7 @@ index 0000000..ecdd563
 +                                global_browse_tool, init_single_video_db)
 +from func_call_shema import as_json_schema
 +from func_call_shema import doc as D
-+from memory_utils import call_openai_model_with_tools, load_config
++from TeleMem.mm_utils.memory_utils import call_openai_model_with_tools, load_config
 +from concurrent.futures import ThreadPoolExecutor, as_completed
 +import re
 +import os
@@ -1375,9 +1178,9 @@ index 0000000..ecdd563
 +
 +# from mm_utils.memory_utils import load_config
 +
-+PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
-+cfg = load_config(os.environ["MM_CONFIG_PATH"])
++# PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++# os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
++# cfg = load_config(os.environ["MM_CONFIG_PATH"])
 +
 +
 +TOPK = 16
@@ -1394,16 +1197,17 @@ index 0000000..ecdd563
 +
 +
 +class MMCoreAgent:
-+    def __init__(self, video_db_path, video_caption_path, max_iterations):
++    def __init__(self, video_db_path, video_caption_path, max_iterations, cfg=None):
 +        self.tools = [frame_inspect_tool, clip_search_tool, global_browse_tool, finish]
-+        if cfg['LITE_MODE']:#config.LITE_MODE:
++        self.cfg = cfg
++        if self.cfg['LITE_MODE']:#config.LITE_MODE:
 +            self.tools.remove(frame_inspect_tool)
 +        self.name_to_function_map = {tool.__name__: tool for tool in self.tools}
 +        self.function_schemas = [
 +            {"function": as_json_schema(func), "type": "function"}
 +            for func in self.name_to_function_map.values()
 +        ]
-+        self.video_db = init_single_video_db(video_caption_path, video_db_path, cfg['emb_dim']) # config.LOCAL_EMBEDDING_LARGE_DIM
++        self.video_db = init_single_video_db(video_caption_path, video_db_path, self.cfg['emb_dim'], self.cfg) # config.LOCAL_EMBEDDING_LARGE_DIM
 +        self.max_iterations = max_iterations
 +        self.messages = self._construct_messages()
 +
@@ -1473,8 +1277,8 @@ index 0000000..ecdd563
 +            args["database"] = self.video_db
 +        
 +        if "topk" in args:
-+            if cfg['OVERWRITE_CLIP_SEARCH_TOPK'] > 0:
-+                args["topk"] = cfg['OVERWRITE_CLIP_SEARCH_TOPK']
++            if self.cfg['OVERWRITE_CLIP_SEARCH_TOPK'] > 0:
++                args["topk"] = self.cfg['OVERWRITE_CLIP_SEARCH_TOPK']
 +
 +        # Call the tool
 +        try:
@@ -1508,11 +1312,11 @@ index 0000000..ecdd563
 +
 +            response = call_openai_model_with_tools(
 +                msgs,
-+                endpoints=cfg['vlm_client'],
-+                model_name=cfg['vlm_model'],
++                endpoints=self.cfg['vlm_client'],
++                model_name=self.cfg['vlm_model'],
 +                tools=self.function_schemas,
-+                temperature=0.0,
-+                # api_key=cfg['vlm_api_key'],
++                temperature=self.cfg['temperature'], #0.3,
++                # api_key=self.cfg['vlm_api_key'],
 +                use_local=True,
 +            )
 +            if response is None:
@@ -1574,11 +1378,11 @@ index 0000000..ecdd563
 +
 +            response = call_openai_model_with_tools(
 +                msgs,
-+                endpoints=cfg['vlm_client'],
-+                model_name=cfg['vlm_model'],
++                endpoints=self.cfg['vlm_client'],
++                model_name=self.cfg['vlm_model'],
 +                tools=self.function_schemas,
 +                temperature=0.0,
-+                # api_key=cfg['vlm_api_key'],
++                # api_key=self.cfg['vlm_api_key'],
 +                use_local=True,
 +            )
 +            if response is None:
@@ -1708,29 +1512,36 @@ index 0000000..ecdd563
 +
 diff --git a/vendor/TeleMem/mm_utils/frame_caption.py b/vendor/TeleMem/mm_utils/frame_caption.py
 new file mode 100644
-index 0000000..3fde873
+index 0000000..2966ab0
 --- /dev/null
 +++ b/vendor/TeleMem/mm_utils/frame_caption.py
-@@ -0,0 +1,617 @@
+@@ -0,0 +1,644 @@
 +import copy
 +import functools
 +import json
 +import multiprocessing as mp
 +import os
-+from typing import Dict, List, Tuple
++from typing import Dict, List, Tuple, Optional
 +
 +from tqdm import tqdm
 +
 +# import config as config
-+from memory_utils import call_openai_model_with_tools, load_config
++from TeleMem.mm_utils.memory_utils import call_openai_model_with_tools, load_config
 +from openai import OpenAI
 +import openai
 +
 +# from mm_utils.utils import load_config
 +
 +PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
-+cfg = load_config(os.environ["MM_CONFIG_PATH"])
++
++
++# def _ensure_cfg(cfg: Optional[dict]) -> dict:
++#     """Return provided cfg or load default config if None."""
++#     if cfg is not None:
++#         return cfg
++#     else:
++#         config_path = os.environ.get("MM_CONFIG_PATH") or os.path.join(PARENT_DIR, "config.yaml")
++#         return load_config(config_path)
 +
 +# --------------------------------------------------------------------------- #
 +#                              Prompt templates                               #
@@ -1850,7 +1661,10 @@ index 0000000..3fde873
 +    return result
 +
 +def gather_clip_frames(
-+    video_frame_folder, clip_secs: int, subtitle_file_path: str = None
++    video_frame_folder,
++    clip_secs: int,
++    subtitle_file_path: str = None,
++    cfg: Optional[dict] = None,
 +) -> Dict[str, Dict]:
 +    # Fix possible typo in the earlier list-comprehension and gather frames again
 +    frame_files = sorted(
@@ -1866,6 +1680,7 @@ index 0000000..3fde873
 +    )
 +
 +    # Map timestamps → file names for quick lookup
++    # cfg = _ensure_cfg(cfg)
 +    frame_ts = [float(f.split("_n")[-1].rstrip(".jpg")) / cfg['VIDEO_FPS'] for f in frame_files]
 +    ts_to_file = dict(zip(frame_ts, frame_files))
 +    last_ts = int(max(frame_ts))
@@ -1960,7 +1775,7 @@ index 0000000..3fde873
 +# --------------------------------------------------------------------------- #
 +#                        LLM wrappers (single clip)                           #
 +# --------------------------------------------------------------------------- #
-+def _caption_clip(task: Tuple[str, Dict], caption_ckpt_folder) -> Tuple[str, dict]:
++def _caption_clip(task: Tuple[str, Dict], caption_ckpt_folder, cfg: Optional[dict] = None) -> Tuple[str, dict]:
 +    """LLM call for one clip. Returns (timestamp_key, parsed_json)."""
 +    timestamp, info = task
 +    files, transcript = info["files"], info["transcript"]
@@ -1978,6 +1793,8 @@ index 0000000..3fde873
 +    
 +
 +    
++    # cfg = _ensure_cfg(cfg)
++
 +    if os.path.exists(os.path.join(caption_ckpt_folder, f"{timestamp}.json")):
 +        # If the caption already exists, skip processing
 +        with open(os.path.join(caption_ckpt_folder, f"{timestamp}.json"), "r") as f:
@@ -2028,13 +1845,15 @@ index 0000000..3fde873
 +# --------------------------------------------------------------------------- #
 +
 +
-+def merge_subject_registries(registries: List[dict]) -> dict:
++def merge_subject_registries(registries: List[dict], cfg: Optional[dict] = None) -> dict:
 +    if not registries:
 +        return {}
 +
++    # cfg = _ensure_cfg(cfg)
++
 +    BATCH_SIZE = 20
 +
-+    def _merge_once(batch: List[dict], level: int, idx: int) -> dict:
++    def _merge_once(batch: List[dict], level: int, idx: int, cfg: dict) -> dict:
 +        print(
 +            f"[INFO] merge_subject_registries: level={level}, batch_idx={idx}, "
 +            f"batch_size={len(batch)}",
@@ -2093,7 +1912,7 @@ index 0000000..3fde873
 +        next_round = []
 +        for i in range(0, len(current_regs), BATCH_SIZE):
 +            batch = current_regs[i:i + BATCH_SIZE]
-+            merged = _merge_once(batch, level=level, idx=i // BATCH_SIZE)
++            merged = _merge_once(batch, level=level, idx=i // BATCH_SIZE, cfg=cfg)
 +            if merged:
 +                next_round.append(merged)
 +        if not next_round:
@@ -2111,15 +1930,19 @@ index 0000000..3fde873
 +    frame_folder: str,
 +    output_caption_folder: str,
 +    subtitle_file_path: str = None,
++    cfg: Optional[dict] = None,
 +):
 +    caption_ckpt_folder = os.path.join(output_caption_folder, "ckpt")
 +    os.makedirs(caption_ckpt_folder, exist_ok=True)
 +
-+    clips = gather_clip_frames(frame_folder, cfg['CLIP_SECS'], subtitle_file_path)
++    # cfg = _ensure_cfg(cfg)
++
++    clips = gather_clip_frames(frame_folder, cfg['CLIP_SECS'], subtitle_file_path, cfg=cfg)
 +
 +    caption_clip = functools.partial(
 +        _caption_clip,
 +        caption_ckpt_folder=caption_ckpt_folder,
++        cfg=cfg,
 +    )
 +    # ---------------- Parallel captioning --------------- #
 +    with mp.Pool(16) as pool:
@@ -2147,7 +1970,7 @@ index 0000000..3fde873
 +
 +
 +    # ---------------- Merge subject registries ---------- #
-+    merged_registry = merge_subject_registries(partial_registries)
++    merged_registry = merge_subject_registries(partial_registries, cfg=cfg)
 +    frame_captions["subject_registry"] = merged_registry
 +
 +    with open(
@@ -2179,8 +2002,10 @@ index 0000000..3fde873
 +def process_all_videos_mme(
 +    frames_root: str,
 +    captions_root: str,
-+    chunk_range=range(1, 21)
++    chunk_range=range(1, 21),
++    cfg: Optional[dict] = None,
 +    ):
++    # cfg = _ensure_cfg(cfg)
 +    for i in chunk_range:
 +        chunk_name = f"videos_chunked_{i:02d}"
 +        chunk_frames_dir = os.path.join(frames_root, chunk_name)
@@ -2228,6 +2053,7 @@ index 0000000..3fde873
 +                    frame_folder=frame_folder,
 +                    output_caption_folder=output_caption_folder,
 +                    subtitle_file_path=None,
++                    cfg=cfg,
 +                )
 +            except Exception as e:
 +                print(f"[ERROR] {chunk_name}/{vid}: {e!r}")
@@ -2238,6 +2064,7 @@ index 0000000..3fde873
 +def process_all_videos_m3_agent(
 +    frames_root: str,
 +    captions_root: str,
++    cfg: Optional[dict] = None,
 +):
 +    """
 +    Batch process all scene videos under m3-agent_dvd/m3-agent_database.
@@ -2257,6 +2084,8 @@ index 0000000..3fde873
 +            kitchen_01/
 +                captions.json
 +    """
++    # cfg = _ensure_cfg(cfg)
++
 +    if not os.path.isdir(frames_root):
 +        print(f"[ERROR] m3-agent frames_root not found -> {frames_root}")
 +        return
@@ -2299,15 +2128,16 @@ index 0000000..3fde873
 +                frame_folder=frame_folder,
 +                output_caption_folder=output_caption_folder,
 +                subtitle_file_path=None,
++                cfg=cfg,
 +            )
 +        except Exception as e:
 +            print(f"[ERROR] m3-agent/{sid}: {e!r}")
-+
-+
 +# --------------------------------------------------------------------------- #
 +#                                    main                                     #
 +# --------------------------------------------------------------------------- #
 +def main():
++    # cfg = _ensure_cfg(None)
++
 +    # Existing Video-MME processing logic
 +    frames_root = "../videomme_dvd/videomme_database"
 +    captions_root = "../videomme_dvd/captions"
@@ -2316,14 +2146,15 @@ index 0000000..3fde873
 +        frames_root=frames_root,
 +        captions_root=captions_root,
 +        chunk_range=range(9, 21),
++        cfg=cfg,
 +    )
 +
-+    
 +    # m3_frames_root = "../m3-agent_dvd/m3-agent_database/robot"
 +    # m3_captions_root = "../m3-agent_dvd/captions"
 +    # process_all_videos_m3_agent(
 +    #     frames_root=m3_frames_root,
 +    #     captions_root=m3_captions_root,
++    #     cfg=cfg,
 +    # )
 +
 +
@@ -2803,24 +2634,22 @@ index 0000000..d68946b
 \ No newline at end of file
 diff --git a/vendor/TeleMem/mm_utils/video_utils.py b/vendor/TeleMem/mm_utils/video_utils.py
 new file mode 100644
-index 0000000..ee417a6
+index 0000000..44f4d08
 --- /dev/null
 +++ b/vendor/TeleMem/mm_utils/video_utils.py
-@@ -0,0 +1,307 @@
+@@ -0,0 +1,310 @@
 +import os
 +import shutil
 +from urllib.parse import urlparse
++from typing import Any, Dict
 +
 +import cv2
 +import yt_dlp
 +
-+# import config as config
 +from tqdm import tqdm
-+from memory_utils import load_config
++from TeleMem.mm_utils.memory_utils import load_config
 +
-+PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-+os.environ["MM_CONFIG_PATH"] = os.path.join(PARENT_DIR, "config.yaml")
-+cfg = load_config(os.environ["MM_CONFIG_PATH"])
++
 +
 +def _is_youtube_url(url: str) -> bool:
 +    """Checks if a URL is a valid YouTube URL."""
@@ -2830,6 +2659,7 @@ index 0000000..ee417a6
 +
 +def load_video(
 +    video_source: str,
++    cfg: Dict[str, Any],
 +    with_subtitle: bool = False,
 +    subtitle_source: str | None = None,
 +) -> str:
@@ -2947,7 +2777,7 @@ index 0000000..ee417a6
 +        raise FileNotFoundError(f"Could not find SRT subtitle for {video_url}")
 +
 +
-+def decode_video_to_frames(video_path: str, frames_dir: str) -> str:
++def decode_video_to_frames(video_path: str, frames_dir: str, cfg: Dict[str, Any]) -> str:
 +    """
 +    Decodes a video into JPEG frames at the frame rate specified by cfg['VIDEO_FPS'].
 +    Frames are saved in cfg['VIDEO_DATABASE_PATH']/video_names/frames/.
@@ -2998,6 +2828,7 @@ index 0000000..ee417a6
 +def batch_decode_videos_to_frames(
 +    input_dir: str,
 +    output_root: str,
++    cfg: Dict[str, Any],
 +    max_workers: int = 4,
 +    ) -> None:
 +    """
@@ -3079,19 +2910,21 @@ index 0000000..ee417a6
 +
 +if __name__ == "__main__":
 +    # download_srt_subtitle("https://www.youtube.com/watch?v=PQFQ-3d2J-8", "./video_database/PQFQ-3d2J-8/subtitles.srt")
-+    
-+    
++    PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++    DEFAULT_CONFIG_PATH = os.path.join(PARENT_DIR, "config.yaml")
++    cfg = load_config(DEFAULT_CONFIG_PATH)
++
 +    input_dir = "../m3-agent/robot/"
 +    output_root = "../m3-agent_dvd/videomme_database/robot/"
-+    
++
 +    batch_decode_videos_to_frames(
 +        input_dir=input_dir,
 +        output_root=output_root,
-+        max_workers=8,   
++        cfg=cfg,
++        max_workers=8,
 +    )
 +    print(f"Frames saved to: {output_root}")
 +
-+    
 +    # root_input_base = "../Video-MME/"
 +    # root_output_base = "../videomme_dvd/videomme_database/"
 +
@@ -3101,41 +2934,43 @@ index 0000000..ee417a6
 +    #     output_root = os.path.join(root_output_base, chunk_name)
 +
 +    #     print(f"\n=== Processing {chunk_name} ===")
-+        
++
 +    #     try:
 +    #         batch_decode_videos_to_frames(
 +    #             input_dir=input_dir,
 +    #             output_root=output_root,
++    #             cfg=cfg,
 +    #             max_workers=8,
 +    #         )
 +    #     except FileNotFoundError as e:
 +    #         print(f"[SKIP] {chunk_name}: {e}")
 +    #     except Exception as e:
 +    #         print(f"[ERROR] {chunk_name}: {e}")
-+    
++
 +    # print("Frames saved Done")
 \ No newline at end of file
 diff --git a/vendor/TeleMem/utils.py b/vendor/TeleMem/utils.py
 new file mode 100644
-index 0000000..eee82ee
+index 0000000..75c7b20
 --- /dev/null
 +++ b/vendor/TeleMem/utils.py
-@@ -0,0 +1,304 @@
+@@ -0,0 +1,352 @@
 +from typing import Any, Dict, List
 +import numpy as np
 +import re
 +import yaml
 +import json
 +from pathlib import Path
++from TeleMem.configs import TeleMemoryConfig
 +
 +def load_config(config_path: str):
 +    config_path = Path(config_path)
 +    if config_path.suffix in {".yaml", ".yml"}:
 +        with open(config_path, "r", encoding="utf-8") as f:
-+            return yaml.safe_load(f)
++            return TeleMemoryConfig(**yaml.safe_load(f))
 +    elif config_path.suffix == ".json":
 +        with open(config_path, "r", encoding="utf-8") as f:
-+            return json.load(f)
++            return TeleMemoryConfig(**json.load(f))
 +    else:
 +        raise ValueError("Unsupported config file format. Use .yaml, .yml or .json")
 +
@@ -3204,6 +3039,31 @@ index 0000000..eee82ee
 +}}
 +}}
 +'''.strip()
++    return system_prompt, user_prompt
++
++def get_update_memory_prompt(new_mem_text, similary_mem_text):
++    system_prompt = "你是一个专业的记忆整理助手，负责对记忆进行增删操作。"
++    user_prompt = f'''
++你将收到一组**已有记忆**和一条或几条**新记忆**。请根据以下规则进行处理：
++- 新记忆不用做任何改动
++- 如果新记忆包含已有记忆中没有的新信息，应保留
++- 如果新记忆是重复或无价值的，则去除
++
++请输出保留后的记忆列表，格式为JSON：
++{{
++  "stored_memories": [
++    {{"summary": "保留后的记忆摘要1"}},
++    {{"summary": "保留后的记忆摘要2"}}
++  ]
++}}
++
++相似记忆片段：
++{similary_mem_text}
++
++新记忆片段：
++{new_mem_text}
++'''.strip()
++
 +    return system_prompt, user_prompt
 +
 +def extract_events_from_text(text: str) -> List[str]:
@@ -3412,6 +3272,28 @@ index 0000000..eee82ee
 +    # 添加最后一组消息
 +    merged.append({"role": current_role, "content": current_content})
 +    return merged
++
++def chunk_with_context(messages, window_size=3):
++    if len(messages) % 2 != 0:
++        messages = messages[:-1]
++    turns = []
++    for i in range(0, len(messages), 2):
++        user_msg = messages[i]
++        if i+1 < len(messages):
++            asst_msg = messages[i+1]
++            turns.append([user_msg, asst_msg])
++
++    chunks = []
++    for i in range(len(turns)):
++        start = max(0, i - window_size)
++        context_turns = turns[start:i+1]
++        flat_chunk = []
++        for turn in context_turns:
++            flat_chunk.extend(turn)
++        chunks.append(flat_chunk)
++    return chunks
++        
++
 +
 +def _cosine_similarity(a, b):
 +    if a.shape != b.shape:
