@@ -452,6 +452,8 @@ Run the multimodal demo:
 python examples/quickstart_mm.py
 ```
 
+On the first run, all frames, captions and VDB JSON will be generated under `output_dir` (default `data/samples/video/`). For reproducibility, we also ship these intermediates in the repo so you can run queries directly without recomputing.
+
 Complete code example:
 
 ```python
@@ -464,16 +466,20 @@ memory = mem0.Memory()
 # Define paths
 video_path = "data/samples/video/3EQLFHRHpag.mp4"
 video_name = os.path.splitext(os.path.basename(video_path))[0]
+output_dir = "data/samples/video"
+os.makedirs(output_dir, exist_ok=True)
+
 
 # Step 1: Add video to memory (auto-processing)
-if not os.path.exists(f"data/samples/video/vdb/{video_name}/{video_name}_vdb.json"):
+vdb_json_path = f"{output_dir}/vdb/{video_name}/{video_name}_vdb.json"
+if not os.path.exists(vdb_json_path):
     result = memory.add_mm(
         video_path=video_path,
-        frames_root="video/frames",
-        captions_root="video/captions",
-        vdb_root="video/vdb",
+        output_dir=output_dir,
     )
     print(f"Video processing complete: {result}")
+else:
+    print(f"VDB already exists: {vdb_json_path}")
 
 # Step 2: Query video content
 question = """The problems people encounter in the video are caused by what?
@@ -485,8 +491,7 @@ question = """The problems people encounter in the video are caused by what?
 
 messages = memory.search_mm(
     question=question,
-    video_db_path=f"vendor/TeleMem/video/vdb/{video_name}/{video_name}_vdb.json",
-    video_caption_path=f"vendor/TeleMem/video/captions/{video_name}/captions.json",
+    output_dir=output_dir,
     max_iterations=15,
 )
 
