@@ -194,13 +194,10 @@ export OPENAI_API_KEY="your-openai-api-key"
 ```
 
 ```python
-# python examples/quickstart.py
 import vendor.TeleMem as mem0
 
-# Load configuration and initialize memory system
 memory = mem0.Memory()
 
-# Simulate multi-turn dialogue data
 messages = [
     {"role": "user", "content": "Jordan, did you take the subway to work again today?"},
     {"role": "assistant", "content": "Yes, James. The subway is much faster than driving. I leave at 7 o'clock and it's just not crowded."},
@@ -208,21 +205,9 @@ messages = [
     {"role": "assistant", "content": "Of course, James. You take Line 2 to Civic Center Station, exit from Exit A, and walk 5 minutes to the company."}
 ]
 
-# Add conversation memory
-memory.add(
-    messages=messages,
-    metadata={
-        "sample_id": "session_001",
-        "user": ["James", "Jordan"]
-    }
-)
-
-# Retrieve relevant memories
-query = "What transportation did Jordan use to go to work today?"
-retrieved = memory.search(query=query, run_id="session_001", limit=3)
-
-print("Retrieval results:")
-print(retrieved)
+memory.add(messages=messages, user_id="Jordan")
+results = memory.search("What transportation did Jordan use to go to work today?", user_id="Jordan")
+print(results)
 ```
 
 默认情况下，`Memory()` 会自动配置以下组件：
