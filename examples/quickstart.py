@@ -1,4 +1,4 @@
-import vendor.TeleMem as mem0
+import telemem as mem0
 
 memory = mem0.Memory()
 

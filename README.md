@@ -168,36 +168,36 @@ Memory capability was assessed via QA benchmarks, e.g.:
 
 ## Quick Start
 
-### Environment Preparation
+### Installation
 
 ```shell
-# Create and activate virtual environment
-conda create -n telemem python=3.10
-conda activate telemem
-# Install dependencies
-pip install -r requirements.txt
-```
+# Clone the repository
+git clone https://github.com/TeleAI-UAGI/telemem.git
+cd telemem
 
-### Apply Patches
+# Install the package (recommended: editable mode for development)
+pip install -e .
 
-```shell
-# Run patch application script (see TeleMem-Overlay.md for details)
-bash scripts/apply_patches.sh
-```
-
-### Example
-
-Set your OpenAI API key:
-```shell
+# Set your OpenAI API key
 export OPENAI_API_KEY="your-openai-api-key"
 ```
 
-```python
-# python examples/quickstart.py
-import vendor.TeleMem as mem0
+**Alternatively**, you can install dependencies manually (not recommended):
+```shell
+pip install -r requirements.txt
+bash scripts/apply_patches.sh  # Only needed for old method
+```
 
+### Basic Usage
+
+```python
+# Import telemem (drop-in replacement for mem0)
+import telemem as mem0
+
+# Create memory instance
 memory = mem0.Memory()
 
+# Add memories
 messages = [
     {"role": "user", "content": "Jordan, did you take the subway to work again today?"},
     {"role": "assistant", "content": "Yes, James. The subway is much faster than driving. I leave at 7 o'clock and it's just not crowded."},
@@ -208,6 +208,14 @@ messages = [
 memory.add(messages=messages, user_id="Jordan")
 results = memory.search("What transportation did Jordan use to go to work today?", user_id="Jordan")
 print(results)
+```
+
+**Or with explicit imports:**
+```python
+from telemem import TeleMemory, TeleMemoryConfig
+
+config = TeleMemoryConfig(buffer_size=128)
+memory = TeleMemory(config=config)
 ```
 
 By default `Memory()` wires up:

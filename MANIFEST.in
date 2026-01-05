@@ -1,0 +1,5 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include telemem *.py
+recursive-include telemem *.yaml

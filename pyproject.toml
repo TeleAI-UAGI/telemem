@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telemem"
+version = "1.1.0"
+description = "Building Long-Term and Multimodal Memory for Agentic AI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "TeleAI-UAGI"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "mem0ai==1.0.1",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "numpy>=1.24.0",
+    "openai>=1.0",
+    "opencv-python-headless>=4.0",
+    "nano-vectordb>=0.0.4",
+    "tqdm>=4.65",
+    "yt-dlp>=2023.0",
+    "sqlalchemy>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "isort>=5.12",
+]
+
+multimodal = [
+    "opencv-python-headless>=4.0",
+    "nano-vectordb>=0.0.4",
+    "yt-dlp>=2023.0",
+]
+
+all = ["telemem[multimodal]"]
+
+[project.urls]
+Homepage = "https://github.com/TeleAI-UAGI/telemem"
+Documentation = "https://github.com/TeleAI-UAGI/telemem#readme"
+Repository = "https://github.com/TeleAI-UAGI/telemem"
+
+[tool.setuptools]
+packages = ["telemem", "telemem.mm_utils"]
+
+[tool.setuptools.package-data]
+telemem = ["*.yaml"]
