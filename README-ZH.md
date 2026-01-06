@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/TeleAI-UAGI/telemem">
-    <img src="../assets/TeleMem.png" width="40%" />
+    <img src="assets/TeleMem.png" width="40%" />
   </a>
 </p>
 
@@ -30,7 +30,7 @@
 
 <div align="center">
   <p>
-      <a href="../README.md">English</a> | <a href="README-ZH.md">简体中文</a>
+      <a href="README.md">English</a> | <a href="README-ZH.md">简体中文</a>
   </p>
   <p>
       <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory">   <p>
