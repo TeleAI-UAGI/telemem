@@ -243,12 +243,12 @@ telemem/
 │ └── quickstart_mm.py      # Quick start(Multimodel)
 ├── docs/
 │ ├── TeleMem-Overlay.md    # Overlay development guide (English)
-│ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
-│ └── README-ZH.md          # Chinese README
+│ └── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
 ├── telemem/                # Telemem code
 ├── tests/                  # Telemem test
 ├── PATCHES.md              # Patch list and descriptions
-├── README.md               # This file
+├── README.md               # English README
+├── README-ZH.md            # Chinese README
 └── pyproject.toml          # Python environment
 ```
 
