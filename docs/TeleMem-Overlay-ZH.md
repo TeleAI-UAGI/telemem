@@ -9,40 +9,6 @@
 
 ---
 
-## 📦 项目结构
-
-```
-telemem/
-├── assets/                   # 文档资源与插图素材
-├── vendor/
-│   └── mem0/                 # 上游 Mem0 仓库源代码（通过 git subtree 引入）
-├── overlay/
-│   └── patches/              # TeleMem 自定义补丁文件（.patch），用于扩展与修改上游代码
-├── scripts/                  # Overlay 管理与自动化脚本
-│   ├── init_upstream.sh      # 初始化上游 subtree 仓库
-│   ├── update_upstream.sh    # 同步上游更新并重新应用 TeleMem 补丁
-│   ├── record_patch.sh       # 将本地代码修改记录为可复现的补丁文件
-│   └── apply_patches.sh      # 应用补丁构建 TeleMem 完整代码
-├── baselines/                # 对比评测使用的基线方法实现
-│   ├── RAG                   # Retrieval-Augmented Generation（检索增强生成）基线
-│   ├── MemoBase              # MemoBase 记忆管理系统
-│   ├── MOOM                  # MOOM 双分支叙事记忆框架
-│   ├── A-mem                 # A-mem 智能体记忆系统基线
-│   └── Mem0                  # Mem0 基线实现
-├── data/                     # 用于评测或演示的小规模示例数据集
-├── examples/                 # 示例代码与教程 Demo
-│   ├── quickstart.py         # 快速入门示例（文本记忆）
-│   └── quickstart_mm.py      # 快速入门示例（多模态记忆）
-├── docs/                     # 项目文档、教程与开发者指南
-│   ├── TeleMem-Overlay.md    # Overlay 开发指南（英文版）
-│   ├── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
-│   └── README-ZH.md          # 项目中文说明文档
-├── PATCHES.md                # TeleMem 补丁列表及功能说明
-└── README.md                 # 项目英文总说明文档（本文件）
-```
-
----
-
 ## 🧩 Overlay 模式是什么？
 
 Overlay 模式是一种轻量化的上游扩展方式，它允许你：
