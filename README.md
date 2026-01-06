@@ -175,14 +175,7 @@ Memory capability was assessed via QA benchmarks, e.g.:
 conda create -n telemem python=3.10
 conda activate telemem
 # Install dependencies
-pip install -r requirements.txt
-```
-
-### Apply Patches
-
-```shell
-# Run patch application script (see TeleMem-Overlay.md for details)
-bash scripts/apply_patches.sh
+pip install -e .
 ```
 
 ### Example
@@ -194,7 +187,7 @@ export OPENAI_API_KEY="your-openai-api-key"
 
 ```python
 # python examples/quickstart.py
-import vendor.TeleMem as mem0
+import telemem as mem0
 
 memory = mem0.Memory()
 
@@ -252,8 +245,10 @@ telemem/
 │ ├── TeleMem-Overlay.md    # Overlay development guide (English)
 │ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
 │ └── README-ZH.md          # Chinese README
+├── telemem/                # Telemem code   
 ├── PATCHES.md              # Patch list and descriptions
-└── README.md               # This file
+├── README.md               # This file
+└── pyproject.toml          # Python environment
 ```
 
 </details>
@@ -444,7 +439,7 @@ On the first run, all frames, captions and VDB JSON will be generated under `out
 Complete code example:
 
 ```python
-import vendor.TeleMem as mem0
+import telemem as mem0
 import os
 
 # Initialize
