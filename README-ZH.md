@@ -242,12 +242,12 @@ telemem/
 │   └── quickstart_mm.py      # 快速入门示例（多模态记忆）
 ├── docs/                     # 项目文档、教程与开发者指南
 │   ├── TeleMem-Overlay.md    # Overlay 开发指南（英文版）
-│   ├── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
-│   └── README-ZH.md          # 项目中文说明文档
+│   └── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
 ├── telemem/                  # TeleMem 源码实现
 ├── tests/                    # TeleMem 测试
 ├── PATCHES.md                # TeleMem 补丁列表及功能说明
-├── README.md                 # 项目英文总说明文档（本文件）
+├── README.md                 # 项目说明文档（英文版）
+├── README-ZH.md              # 项目说明文档（中文版）
 └── pyproject.toml            # TeleMem 环境配置
 ```
 
