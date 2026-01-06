@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "telemem"
+version = "1.1.0"
+description = "High-performance drop-in replacement of Mem0"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "TeleAI-UAGI"}
+]
+dependencies = [
+    "openai",
+    "pydantic",
+    "chromadb",
+    "opencv-python-headless",
+    "nano-vectordb",
+    "mem0ai",
+    "tqdm",
+    "azure-identity",
+    "yt_dlp",
+    "faiss-cpu"
+]
+
+[project.urls]
+Homepage = "https://github.com/TeleAI-UAGI/telemem"
+Documentation = "https://github.com/TeleAI-UAGI/telemem#readme"
+
+[tool.hatch.build.targets.wheel]
+packages = ["telemem"]
