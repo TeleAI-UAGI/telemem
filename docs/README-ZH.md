@@ -177,14 +177,7 @@ conda create -n telemem python=3.10
 conda activate telemem
 
 # 安装依赖
-pip install -r requirements.txt
-```
-
-### 应用补丁
-
-```shell
-# 执行补丁应用脚本（详细说明见TeleMem-Overlay.md）
-bash scripts/apply_patches.sh
+pip install -e .
 ```
 
 ### 示例
@@ -195,7 +188,7 @@ export OPENAI_API_KEY="your-openai-api-key"
 ```
 
 ```python
-import vendor.TeleMem as mem0
+import telemem as mem0
 
 memory = mem0.Memory()
 
@@ -251,8 +244,10 @@ telemem/
 │   ├── TeleMem-Overlay.md    # Overlay 开发指南（英文版）
 │   ├── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
 │   └── README-ZH.md          # 项目中文说明文档
+├── telemem/                  # TeleMem 源码实现
 ├── PATCHES.md                # TeleMem 补丁列表及功能说明
-└── README.md                 # 项目英文总说明文档（本文件）
+├── README.md                 # 项目英文总说明文档（本文件）
+└── pyproject.toml            # TeleMem 环境配置
 ```
 
 </details>
@@ -445,7 +440,7 @@ python examples/quickstart_mm.py
 完整代码示例：
 
 ```python
-import vendor.TeleMem as mem0
+import telemem as mem0
 import os
 
 # 初始化模型
