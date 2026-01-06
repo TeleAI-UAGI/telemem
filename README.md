@@ -245,7 +245,8 @@ telemem/
 │ ├── TeleMem-Overlay.md    # Overlay development guide (English)
 │ ├── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
 │ └── README-ZH.md          # Chinese README
-├── telemem/                # Telemem code   
+├── telemem/                # Telemem code
+├── tests/                  # Telemem test
 ├── PATCHES.md              # Patch list and descriptions
 ├── README.md               # This file
 └── pyproject.toml          # Python environment
