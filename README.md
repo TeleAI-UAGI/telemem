@@ -28,7 +28,6 @@
 
 ---
 
-
 <div align="center">
   <p>
       <a href="README.md">English</a> | <a href="README-ZH.md">简体中文</a>
@@ -38,7 +37,7 @@
   </p>
 </div>
 
-TeleMem is an agent memory management layer that can be used as <mark>**a drop-in replacement for [Mem0](https://mem0.ai/)** with one line of code (`import vendor.TeleMem as mem0`)</mark>, deeply optimized for complex scenarios involving **multi-turn dialogues**, **character modeling**, **long-term information storage**, and **semantic retrieval**.
+TeleMem is an agent memory management layer that can be used as <mark>**a drop-in replacement for [Mem0](https://mem0.ai/)** with one line of code (`import telemem as mem0`)</mark>, deeply optimized for complex scenarios involving **multi-turn dialogues**, **character modeling**, **long-term information storage**, and **semantic retrieval**.
 
 Through its unique **context-aware enhancement mechanism**, TeleMem provides conversational AI with core infrastructure offering **higher accuracy**, **faster performance**, and **stronger character memory capabilities**.
 
