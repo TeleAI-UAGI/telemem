@@ -1,13 +1,13 @@
 <p align="center">
   <a href="https://github.com/TeleAI-UAGI/telemem">
-    <img src="../assets/TeleMem.png" width="40%" />
+    <img src="assets/TeleMem.png" width="40%" />
   </a>
 </p>
 
 <h1 align="center"> TeleMem: Building Long-Term and Multimodal Memory for Agentic AI </h1>
 
 <p align="center">
-  <a href="TeleMem_Tech_Report.pdf">
+  <a href="docs/TeleMem_Tech_Report.pdf">
     <img src="https://img.shields.io/badge/arXiv-Paper-red" alt="arXiv">
   </a>
   <a href="https://github.com/TeleAI-UAGI/telemem">
@@ -30,7 +30,7 @@
 
 <div align="center">
   <p>
-      <a href="../README.md">English</a> | <a href="README-ZH.md">简体中文</a>
+      <a href="README.md">English</a> | <a href="README-ZH.md">简体中文</a>
   </p>
   <p>
       <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory">   <p>
@@ -105,7 +105,7 @@ TeleMem 通过一套深度优化的**角色化摘要生成 → 语义聚类去�
 * 多模态 Agent 记忆管理
 * 长视频理解与信息检索
 
-![image](../assets/text-writing.png)
+![image](assets/text-writing.png)
 
 ---
 
@@ -566,13 +566,13 @@ video/
 ------
 ## 开发与贡献
 
-* 叠加（Overlay）开发模式说明：[TeleMem-Overlay-ZH.md](TeleMem-Overlay-ZH.md)
-* 英文文档：[README.md](../README.md)
+* 叠加（Overlay）开发模式说明：[TeleMem-Overlay-ZH.md](docs/TeleMem-Overlay-ZH.md)
+* 英文文档：[README.md](README.md)
 
 ---
 ## 许可证
 
-[Apache 2.0 License](../LICENSE)
+[Apache 2.0 License](LICENSE)
 
 ---
 ## 致谢
@@ -596,7 +596,7 @@ Made with ❤️ by the Ubiquitous AGI team at TeleAI.
 </div>
 
 <div align="center" style="margin-top: 10px;">
-  <img src="../assets/TeleAI.jpg" alt="TeleAI Logo" height="120px" />
+  <img src="assets/TeleAI.jpg" alt="TeleAI Logo" height="120px" />
   &nbsp;&nbsp;&nbsp;
-  <img src="../assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
+  <img src="assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
 </div>

@@ -31,7 +31,7 @@
 
 <div align="center">
   <p>
-      <a href="README.md">English</a> | <a href="docs/README-ZH.md">简体中文</a>
+      <a href="README.md">English</a> | <a href="README-ZH.md">简体中文</a>
   </p>
   <p>
       <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory"> <strong>📄 Awesome-Agent-Memory →</strong></a>
@@ -567,7 +567,7 @@ video/
 ## Development and Contribution
 
 * Overlay development process: [TeleMem-Overlay.md](docs/TeleMem-Overlay.md)
-* Chinese documentation: [README-ZH.md](docs/README-ZH.md)
+* Chinese documentation: [README-ZH.md](README-ZH.md)
 
 ---
 ## License
