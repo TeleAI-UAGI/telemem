@@ -24,7 +24,7 @@ python run.py \
   --local_chat_model qwen3-8b \
   --local_embed_api_base http://127.0.0.1:8082/v1 \
   --local_embed_model qwen3-8b-embedding \
-  --memory_name locomo \
+  --memory_name zh4o \
   --input ../data/zh4o/data.json
 ```
 
@@ -33,9 +33,9 @@ python run.py \
 ```bash
 python run.py \
   --method search \
-  --input ./data/locomo10.json \
-  --memory_name locomo \
-  --output ./results/locomo10.json \
+  --input ../data/zh4o/data.json \
+  --memory_name zh4o \
+  --output ./results/ZH-4O_results.json \
   --top_k 30 \
   --memory_provider local \
   --local_vllm_api_base http://127.0.0.1:8089/v1 \
