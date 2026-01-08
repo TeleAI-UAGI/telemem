@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description="Memory management system for conversation-based applications")
     parser.add_argument("--method", choices=["add", "search"], default="add")
     parser.add_argument("--input", default="./data/input.json")
-    parser.add_argument("--output", default="../../results/mem0_results/", help="Output directory for search results")
+    parser.add_argument("--output", default="./logs/results_qwen3-8b_ratio1.0", help="Output directory for search results")
     parser.add_argument("--top_k", type=int, default=30)
     parser.add_argument("--filter_memories", action="store_true", default=False)
     parser.add_argument("--is_graph", action="store_true", default=False)

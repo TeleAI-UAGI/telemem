@@ -35,7 +35,7 @@ python run.py \
   --method search \
   --input ../data/zh4o/data.json \
   --memory_name zh4o \
-  --output ./results/ZH-4O_results.json \
+  --output ./logs/results_qwen3-8b_ratio1.0 \
   --top_k 30 \
   --memory_provider local \
   --local_vllm_api_base http://127.0.0.1:8089/v1 \
@@ -45,7 +45,7 @@ python run.py \
 ```
 #### 3. Eval
 ```bash
-python evaluate_zh.py --input ./results/ZH-4O_results.json
+python ../evaluate.py --results_dir ./logs/results_qwen3-8b_ratio1.0 --output eval_results.json
 ```
 ## Configuration
 
@@ -54,7 +54,7 @@ python evaluate_zh.py --input ./results/ZH-4O_results.json
 **Basic Parameters:**
 - `--method`: Operation mode - `add` or `search` (default: `add`)
 - `--input`: Path to input data file (default: `./data/input.json`)
-- `--output`: Path to output results file 
+- `--output`: Path to output results directory (default: `../../results/mem0_results/`)
 - `--top_k`: Number of memories to return in search (default: `30`)
 - `--filter_memories`: Enable memory filtering (default: `False`)
 - `--is_graph`: Enable graph-based search (default: `False`)
@@ -180,7 +180,22 @@ The input JSON file should contain an array of conversation objects:
 ```
 
 ### Output Data Format
-Search results are saved in JSON format with retrieved memories and metadata.
+Search results are saved in the specified output directory, with one JSON file per sample (e.g., `results_sample_0.json`).
+
+Each result record contains:
+- `qa_id`: Original question ID
+- `question`: The question text
+- `ground_truth`: The expected answer
+- `category`: Question category
+- `input_prompt`: The full prompt sent to the LLM (including retrieved memories)
+- `response`: The model's response (following a specific format `<eoe>ANSWER`)
+- `input_tokens` / `output_tokens`: Token usage statistics
+- `speaker_1_memories` / `speaker_2_memories`: Memories retrieved for each speaker
+
+### LLM Constraints
+Following the evaluation specification:
+- **Temperature**: All LLM calls use `temperature=0.7`.
+- **Thinking Mode**: Reasoning/Thinking features are disabled to ensure direct evaluation of memory retrieval.
 
 ## Contributing
 
