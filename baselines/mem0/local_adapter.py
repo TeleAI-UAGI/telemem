@@ -209,7 +209,7 @@ class LocalMemClient:
         # print(_OpenAI)
         if _OpenAI is not None and self._embed_api_base:
 
-            self._embed_client = _OpenAI(base_url=self._embed_api_base, api_key=_os.getenv("OPENAI_API_KEY", "EMPTY"))
+            self._embed_client = _OpenAI(base_url=self._embed_api_base, api_key=os.getenv("OPENAI_API_KEY", "EMPTY"))
 
         try:
             with open(self._store_path, "r", encoding="utf-8") as f:

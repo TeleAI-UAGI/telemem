@@ -198,7 +198,7 @@ Rules:
                 "provider": "openai",
                 "config": {
                     "model": self.chat_model,
-                    "custom_instructions": custom_instructions,
+                    "openai_base_url": os.environ.get("OPENAI_BASE_URL"),
                 },
             },
             "embedder": {

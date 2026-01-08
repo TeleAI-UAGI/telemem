@@ -20,12 +20,12 @@ pip install -r requirements.txt
 python run.py \
   --method add \
   --memory_provider local \
-  --local_vllm_api_base http://127.0.0.1:8089/v1 \
+  --local_vllm_api_base http://127.0.0.1:4000/v1 \
   --local_chat_model qwen3-8b \
   --local_embed_api_base http://127.0.0.1:8082/v1 \
   --local_embed_model qwen3-8b-embedding \
   --memory_name zh4o \
-  --input ../data/zh4o/data.json
+  --input ../../data/zh4o/data.json
 ```
 
 #### 2. Search Memories
@@ -38,7 +38,7 @@ python run.py \
   --output ./logs/results_qwen3-8b_ratio1.0 \
   --top_k 30 \
   --memory_provider local \
-  --local_vllm_api_base http://127.0.0.1:8089/v1 \
+  --local_vllm_api_base http://127.0.0.1:4000/v1 \
   --local_embed_api_base http://127.0.0.1:8082/v1 \
   --local_chat_model qwen3-8b \
   --local_embed_model qwen3-8b-embedding
