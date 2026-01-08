@@ -30,7 +30,7 @@ load_dotenv()
 class MemorySearch:
     def __init__(
         self,
-        output_path="results.json",
+        output_path="results",
         top_k=10,
         filter_memories=False,
         is_graph=False,
@@ -79,11 +79,14 @@ class MemorySearch:
         )
         # 结果对齐 evaluation：使用列表而非分组字典
         self.results = []  # type: ignore[var-annotated]
-        self.output_path = output_path
+        self.output_dir = output_path
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir, exist_ok=True)
+            
         self.filter_memories = filter_memories
         self.is_graph = is_graph
         self.processed_question_ids = set()  # 记录已处理的问答对ID
-        self.file_lock = Lock()  # 文件写入锁，确保线程安全
+        self.file_lock = Lock()  # 写入锁，确保线程安全
         
         # Token和时间统计
         self.total_input_tokens = 0
@@ -111,31 +114,33 @@ class MemorySearch:
         return hashlib.md5(content.encode('utf-8')).hexdigest()
 
     def _load_existing_results(self):
-        """加载现有结果文件，支持中断继续"""
-        if os.path.exists(self.output_path):
-            try:
-                with open(self.output_path, "r", encoding="utf-8") as f:
-                    existing_results = json.load(f)
-                    self.results = existing_results
-                    # 记录已处理的问答对ID
-                    for result in existing_results:
-                        sample_id = result.get("sample_id", "")
-                        question = result.get("question", "")
-                        category = result.get("category", "")
-                        if question:
-                            # 如果有sample_id，直接使用；否则基于内容生成
-                            if sample_id:
-                                # 加入category信息来唯一标识问题实例
-                                question_id = f"{sample_id}_{question}_{category}"
-                            else:
-                                # 对于旧的结果文件，尝试基于内容重建ID
-                                question_id = self._generate_question_id(0, question)  # 使用默认sample_idx
-                            self.processed_question_ids.add(question_id)
-                    print(f"加载了 {len(self.results)} 个现有结果，跳过 {len(self.processed_question_ids)} 个已处理的问答对")
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"警告：无法加载现有结果文件 {self.output_path}，将重新开始处理。错误：{e}")
-                self.results = []
-                self.processed_question_ids = set()
+        """加载现有结果目录，支持中断继续"""
+        if os.path.exists(self.output_dir) and os.path.isdir(self.output_dir):
+            import glob
+            result_files = glob.glob(os.path.join(self.output_dir, "results_sample_*.json"))
+            if not result_files:
+                return
+
+            print(f"在 {self.output_dir} 中发现 {len(result_files)} 个现有结果文件")
+            for rf in result_files:
+                try:
+                    with open(rf, "r", encoding="utf-8") as f:
+                        file_results = json.load(f)
+                        self.results.extend(file_results)
+                        for result in file_results:
+                            sample_id = result.get("sample_id", "")
+                            question = result.get("question", "")
+                            category = result.get("category", "")
+                            if question:
+                                if sample_id:
+                                    question_id = f"{sample_id}_{question}_{category}"
+                                else:
+                                    question_id = self._generate_question_id(0, question)
+                                self.processed_question_ids.add(question_id)
+                except Exception as e:
+                    print(f"无法加载文件 {rf}: {e}")
+            
+            print(f"已处理的问答对总数: {len(self.processed_question_ids)}")
 
     def search_memory(self, user_id, query, max_retries=100, retry_delay=0.5):
         start_time = time.time()
@@ -225,6 +230,7 @@ class MemorySearch:
                 response = self.openai_client.chat.completions.create(
                     model=os.getenv("MODEL") or "your-chat-model",
                     messages=[{"role": "system", "content": answer_prompt}],
+                    temperature=0.7,
                     extra_body={"chat_template_kwargs": {"enable_thinking": False}},
                 )
                 t2 = time.time()
@@ -253,6 +259,7 @@ class MemorySearch:
                     response_time,
                     int(actual_input_tokens),
                     int(output_tokens),
+                    answer_prompt,
                 )
             except Exception as e:
                 retries += 1
@@ -268,9 +275,9 @@ class MemorySearch:
                     # 非限速错误直接抛出
                     raise e
 
-    def process_question(self, val, speaker_a_user_id, speaker_b_user_id):
+    def process_question(self, val, speaker_a_user_id, speaker_b_user_id, qa_id=None):
         question = val.get("question", "")
-        answer = val.get("answer", "")
+        ground_truth = val.get("answer", "")
         category = val.get("category", -1)
         evidence = val.get("evidence", [])
         adversarial_answer = val.get("adversarial_answer", "")
@@ -286,12 +293,15 @@ class MemorySearch:
             response_time,
             input_tokens,
             output_tokens,
-        ) = self.answer_question(speaker_a_user_id, speaker_b_user_id, question, answer, category)
+            input_prompt,
+        ) = self.answer_question(speaker_a_user_id, speaker_b_user_id, question, ground_truth, category)
 
         result = {
+            "qa_id": qa_id,
             "question": question,
-            "answer": answer,
+            "ground_truth": ground_truth,
             "category": category,
+            "input_prompt": input_prompt,
             "response": response,
             # 额外字段不影响评测
             "evidence": evidence,
@@ -312,13 +322,34 @@ class MemorySearch:
         }
         return result
 
-    def _save_results_safe(self, new_results):
-        """线程安全地保存结果到文件"""
+    def _save_conversation_results(self, sample_id, conversation_results):
+        """保存单个对话的结果到一个独立的JSON文件"""
+        if not conversation_results:
+            return
+            
+        file_path = os.path.join(self.output_dir, f"results_sample_{sample_id}.json")
+        
+        # 如果文件已存在，先读取现有内容并合并（支持部分更新）
+        existing_data = []
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    existing_data = json.load(f)
+            except:
+                pass
+        
+        # 合并结果（去重）
+        existing_questions = {res.get("question") for res in existing_data}
+        for res in conversation_results:
+            if res.get("question") not in existing_questions:
+                existing_data.append(res)
+        
         with self.file_lock:
-            # 更新内存中的结果列表
-            self.results.extend(new_results)
-            with open(self.output_path, "w", encoding="utf-8") as f:
-                json.dump(self.results, f, indent=4, ensure_ascii=False)
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(existing_data, f, indent=4, ensure_ascii=False)
+            
+            # 同时更新内存中的全局结果（仅用于显示统计信息）
+            self.results.extend(conversation_results)
 
     def _process_single_conversation(self, idx, item):
         """处理单个对话的辅助方法（用于并行处理）"""
@@ -366,18 +397,18 @@ class MemorySearch:
                         sample_new_results.append(result)
                         sample_processed_questions += 1
                 except Exception as e:
-                    print(f"警告：处理对话 {idx} 的问题 {question_idx} 时出错，跳过该问题。错误：{e}")
+                    print(f"警告：处理对话 {idx} 的问题 {question_idx} 时出错，跳检该问题。错误：{e}")
 
         # 实时保存该对话的结果
         if sample_new_results:
-            self._save_results_safe(sample_new_results)
+            self._save_conversation_results(sample_id, sample_new_results)
 
         return sample_id, sample_processed_questions, len(qa), len(questions_to_process) - sample_processed_questions, sample_new_results
 
     def _process_single_question_safe(self, question_idx, question_item, question_id, speaker_a_user_id, speaker_b_user_id):
         """线程安全的单个问题处理方法"""
         try:
-            result = self.process_question(question_item, speaker_a_user_id, speaker_b_user_id)
+            result = self.process_question(question_item, speaker_a_user_id, speaker_b_user_id, qa_id=str(question_idx))
             # 从question_id中正确提取sample_id（question_id格式为：sample_id_question_text_category）
             parts = question_id.split('_', 1)  # 只分割第一个下划线
             result["sample_id"] = parts[0]
@@ -532,5 +563,5 @@ class MemorySearch:
         print(f"- 平均每问题响应时间: {self.total_response_time / max(1, self.processed_questions_count):.3f}秒")
         print(f"- 平均每问题内存搜索时间: {self.total_memory_time / max(1, self.processed_questions_count):.3f}秒")
 
-        # 最终保存一次（确保所有结果都被写入）
-        self._save_results_safe([])
+        # 任务完成
+        print(f"\n✅ 所有结果已保存在目录: {self.output_dir}")

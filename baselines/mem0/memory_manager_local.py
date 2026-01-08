@@ -96,6 +96,7 @@ class VideoMemoryManager:
             _orig_create = _ChatCompletions.create
 
             def _patched_create(self, *args, **kwargs):  # type: ignore[no-redef]
+                kwargs["temperature"] = 0.7  # 强制 temperature=0.7
                 extra_body = kwargs.get("extra_body")
                 if extra_body is None:
                     kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}

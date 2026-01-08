@@ -47,12 +47,12 @@ class Mem0Manager:
         manager.process_all_conversations()
 
     # 检索阶段
-    def run_search(self, data_path: str, output_file_path: str) -> None:
-        Path(Path(output_file_path).parent).mkdir(parents=True, exist_ok=True)
+    def run_search(self, data_path: str, output_dir_path: str) -> None:
+        Path(output_dir_path).mkdir(parents=True, exist_ok=True)
         max_workers = self.provider_config.get("max_workers", 28)
         question_workers = self.provider_config.get("question_workers", 4)
         searcher = MemorySearch(
-            output_path=output_file_path,
+            output_path=output_dir_path,
             top_k=self.top_k,
             filter_memories=self.filter_memories,
             is_graph=self.is_graph,
