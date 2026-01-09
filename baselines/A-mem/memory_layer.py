@@ -7,15 +7,17 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import os
 from abc import ABC, abstractmethod
-from nltk.tokenize import word_tokenize
 import pickle
 from pathlib import Path
 from litellm import completion
 import time
 import requests
-
-def simple_tokenize(text):
-    return word_tokenize(text)
+from prompts import (
+    JSON_RESPONSE_SYSTEM_PROMPT,
+    build_content_analysis_prompt,
+    build_evolution_system_prompt,
+    STRICT_JSON_INSTRUCTION
+)
 
 class BaseLLMController(ABC):
     @abstractmethod
@@ -48,7 +50,7 @@ class OpenAIController(BaseLLMController):
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "You must respond with a JSON object."},
+                {"role": "system", "content": JSON_RESPONSE_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
             response_format=response_format,
@@ -113,7 +115,7 @@ class OllamaController(BaseLLMController):
             response = completion(
                 model="ollama_chat/{}".format(self.model),
                 messages=[
-                    {"role": "system", "content": "You must respond with a JSON object."},
+                    {"role": "system", "content": JSON_RESPONSE_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
                 ],
                 response_format=response_format,
@@ -198,41 +200,14 @@ class MemoryNote:
     @staticmethod
     def analyze_content(content: str, llm_controller: LLMController) -> Dict:            
         """Analyze content to extract keywords, context, and other metadata"""
-        prompt = """Generate a structured analysis of the following content by:
-            1. Identifying the most salient keywords (focus on nouns, verbs, and key concepts)
-            2. Extracting core themes and contextual elements
-            3. Creating relevant categorical tags
-
-            Format the response as a JSON object:
-            {
-                "keywords": [
-                    // several specific, distinct keywords that capture key concepts and terminology
-                    // Order from most to least important
-                    // Don't include keywords that are the name of the speaker or time
-                    // At least three keywords, but don't be too redundant.
-                ],
-                "context": 
-                    // one sentence summarizing:
-                    // - Main topic/domain
-                    // - Key arguments/points
-                    // - Intended audience/purpose
-                ,
-                "tags": [
-                    // several broad categories/themes for classification
-                    // Include domain, format, and type tags
-                    // At least three tags, but don't be too redundant.
-                ]
-            }
-
-            Content for analysis:
-            """ + content
+        prompt = build_content_analysis_prompt(content)
         response = None
         max_retries = 3
         last_error = None
         for attempt in range(max_retries):
             try:
                 response = llm_controller.llm.get_completion(
-                    prompt + "\nReturn ONLY a valid JSON object strictly matching the schema. No explanations, no markdown.",
+                    prompt + STRICT_JSON_INSTRUCTION,
                     response_format={"type": "json_schema", "json_schema": {
                                 "name": "response",
                                 "schema": {
@@ -477,37 +452,6 @@ class AgenticMemorySystem:
         self.embedding_model = embedding_model
         self.retriever = SimpleEmbeddingRetriever(embedding_url, embedding_model)
         self.llm_controller = LLMController(llm_backend, llm_model, api_key)
-        self.evolution_system_prompt = '''
-                                You are an AI memory evolution agent responsible for managing and evolving a knowledge base.
-                                Analyze the the new memory note according to keywords and context, also with their several nearest neighbors memory.
-                                Make decisions about its evolution.  
-
-                                The new memory context:
-                                {context}
-                                content: {content}
-                                keywords: {keywords}
-
-                                The nearest neighbors memories:
-                                {nearest_neighbors_memories}
-
-                                Based on this information, determine:
-                                1. Should this memory be evolved? Consider its relationships with other memories.
-                                2. What specific actions should be taken (strengthen, update_neighbor)?
-                                   2.1 If choose to strengthen the connection, which memory should it be connected to? Can you give the updated tags of this memory?
-                                   2.2 If choose to update_neighbor, you can update the context and tags of these memories based on the understanding of these memories. If the context and the tags are not updated, the new context and tags should be the same as the original ones. Generate the new context and tags in the sequential order of the input neighbors.
-                                Tags should be determined by the content of these characteristic of these memories, which can be used to retrieve them later and categorize them.
-                                Note that the length of new_tags_neighborhood must equal the number of input neighbors, and the length of new_context_neighborhood must equal the number of input neighbors.
-                                The number of neighbors is {neighbor_number}.
-                                Return your decision in JSON format with the following structure:
-                                {{
-                                    "should_evolve": True or False,
-                                    "actions": ["strengthen", "update_neighbor"],
-                                    "suggested_connections": ["neighbor_memory_ids"],
-                                    "tags_to_update": ["tag_1",..."tag_n"], 
-                                    "new_context_neighborhood": ["new context",...,"new context"],
-                                    "new_tags_neighborhood": [["tag_1",...,"tag_n"],...["tag_1",...,"tag_n"]],
-                                }}
-                                '''
         self.evo_cnt = 0 
         self.evo_threshold = evo_threshold
 
@@ -546,7 +490,13 @@ class AgenticMemorySystem:
     def process_memory(self, note: MemoryNote) -> bool:
         """Process a memory note and return an evolution label"""
         neighbor_memory, indices = self.find_related_memories(note.content, k=5)
-        prompt_memory = self.evolution_system_prompt.format(context=note.context, content=note.content, keywords=note.keywords, nearest_neighbors_memories=neighbor_memory,neighbor_number=len(indices))
+        prompt_memory = build_evolution_system_prompt(
+            context=note.context,
+            content=note.content,
+            keywords=str(note.keywords),
+            nearest_neighbors_memories=neighbor_memory,
+            neighbor_number=len(indices)
+        )
         # print("prompt_memory", prompt_memory)
         # 带重试机制获取并解析严格JSON
         max_retries = 3
@@ -555,7 +505,7 @@ class AgenticMemorySystem:
         for attempt in range(max_retries):
             try:
                 response = self.llm_controller.llm.get_completion(
-                    prompt_memory + "\nReturn ONLY a valid JSON object strictly matching the schema. No explanations, no markdown.",
+                    prompt_memory + STRICT_JSON_INSTRUCTION,
                     response_format={"type": "json_schema", "json_schema": {
                                 "name": "response",
                                 "schema": {
@@ -603,7 +553,7 @@ class AgenticMemorySystem:
                                 },
                                 "strict": True
                             }},
-                    temperature=0.2
+                    temperature=0.7
                 )
             except Exception as call_error:
                 last_error = call_error
@@ -621,11 +571,11 @@ class AgenticMemorySystem:
                 break
             except Exception as parse_error:
                 last_error = parse_error
-                # print(f"JSON parse failed on attempt {attempt+1}/{max_retries}: {parse_error}")
+                print(f"JSON parse failed on attempt {attempt+1}/{max_retries}: {parse_error}")
                 continue
 
         if response_json is None:
-            # print(f"Failed to obtain valid JSON after {max_retries} attempts: {last_error}")
+            print(f"Failed to obtain valid JSON after {max_retries} attempts: {last_error}")
             # 安全回退：不进行演化，保持系统稳定
             response_json = {
                 "should_evolve": False,

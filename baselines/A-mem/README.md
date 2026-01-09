@@ -1,30 +1,7 @@
 # Run the experiments on ZH-4O Chinese dataset:
 ```bash
-python test_advanced.py \
-    --dataset ../../data/zh4o/data.json \
-    --model qwen3-8b \
-    --backend openai \
-    --retrieve_k 10 \
-    --workers 1 \
-    --embedding_url http://your-embedding-server:port/v1/embeddings \
-    --embedding_model qwen3-8b-embedding \
-    --llm_base_url http://your-llm-server:port/v1 \
-    --llm_api_key your-api-key
+bash run_test.sh
 ```
-
-**Parameters:**
-- `--dataset`: Path to the dataset file (default: `data/ZH-4O_locomo_format.json`)
-- `--model`: LLM model name (default: `qwen3-8b`)
-- `--backend`: LLM backend, either `openai` or `ollama` (default: `openai`)
-- `--retrieve_k`: Number of memories to retrieve (default: `10`)
-- `--workers`: Number of parallel workers (default: `10`, use `1` for sequential processing)
-- `--embedding_url`: URL of the embedding API endpoint
-- `--embedding_model`: Name of the embedding model
-- `--llm_base_url`: Base URL for the LLM API (OpenAI compatible)
-- `--llm_api_key`: API key for the LLM API (can be dummy if server doesn't validate)
-- `--ratio`: Ratio of dataset to evaluate, 0.0-1.0 (default: `1.0`)
-- `--output`: Path to save evaluation results (optional)
-
 
 # Agentic Memory 🧠
 
