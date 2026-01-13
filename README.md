@@ -51,9 +51,10 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 
 ## 📢 Latest Updates
 
-- **[2025-01-09] 🎉 TeleMem [v1.2.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.2.0) Released!**
-- **[2025-12-31] 🎉 TeleMem [v1.1.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.1.0) Released!**
-- **[2025-12-05] 🎉 TeleMem [v1.0.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.0.0) Released!**
+- **[2025-01-13] 🎉 TeleMem [Tech Report](https://arxiv.org/abs/2601.06037) has been released on arXiv!**
+- **[2025-01-09] 🎉 TeleMem [v1.2.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.2.0) released!**
+- **[2025-12-31] 🎉 TeleMem [v1.1.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.1.0) released!**
+- **[2025-12-05] 🎉 TeleMem [v1.0.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.0.0) released!**
 
 ---
 
