@@ -1,2 +1,2 @@
 from mem0 import *
-from .main import TeleMemory as Memory
+from .mem0 import TeleMemory as Memory
