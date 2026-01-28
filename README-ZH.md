@@ -52,6 +52,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 
 ## 📢 最新动态
 
+- **[2026-01-28] 🎉 TeleMem [v1.3.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.3.0) 版本发布!**
 - **[2026-01-22] 🎉 TeleMem [技术报告](https://arxiv.org/abs/2601.06037) 已经更新至第4版!**
 - **[2026-01-13] 🎉 TeleMem [技术报告](https://arxiv.org/abs/2601.06037) 已经在arXiv上发布!**
 - **[2026-01-09] 🎉 TeleMem [v1.2.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.2.0) 版本发布!**
