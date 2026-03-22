@@ -584,12 +584,12 @@ video/
 
 TeleMem’s development has been deeply inspired by open-source communities and cutting-edge research. We extend our sincere gratitude to the following projects and teams:
 
-- [**Mem0**](https://github.com/mem0ai/mem0)
-- [**Memobase**](https://github.com/memodb-io/memobase)
-- [**MOOM**](https://github.com/cows21/MOOM-Roleplay-Dialogue)
-- [**DVD**](https://github.com/microsoft/DeepVideoDiscovery)
-- [**Memento**](https://github.com/Agent-on-the-Fly/Memento)
-  
+- **[Mem0](https://github.com/mem0ai/mem0)**
+- **[Memobase](https://github.com/memodb-io/memobase)**
+- **[MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)**
+- **[DVD](https://github.com/microsoft/DeepVideoDiscovery)**
+- **[Memento](https://github.com/Agent-on-the-Fly/Memento)**
+- **[Momento-Skills](https://github.com/Memento-Teams/Memento-Skills)**
 ------
 
 ## Star History
