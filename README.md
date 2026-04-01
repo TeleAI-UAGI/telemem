@@ -214,6 +214,29 @@ By default `Memory()` wires up:
 
 If you want to customize the configuration, please modify `config/config.yaml`.
 
+### Using MiniMax as the LLM Provider
+
+TeleMem supports [MiniMax](https://api.minimax.io) as an LLM backend via its OpenAI-compatible API.
+A ready-to-use example config is provided at `config/config.minimax.yaml`.
+
+```shell
+export MINIMAX_API_KEY="your-minimax-api-key"
+export OPENAI_API_KEY="your-openai-api-key"  # still needed for embeddings
+```
+
+```python
+from telemem.utils import load_config
+import telemem as mem0
+
+config = load_config("config/config.minimax.yaml")
+memory = mem0.Memory(config=config)
+```
+
+Key points for MiniMax usage:
+- **LLM**: MiniMax M2.7 / M2.7-highspeed (204K context) via `https://api.minimax.io/v1`
+- **Temperature**: must be in **(0.0, 1.0]** — set explicitly (e.g. `0.7`) to avoid out-of-range errors
+- **Embeddings**: MiniMax does not provide a public embedding API; configure a separate embedder (e.g. `text-embedding-3-small`) in the `embedder` section
+
 ---
 
 ## Project Structure
