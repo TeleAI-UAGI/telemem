@@ -1,0 +1,33 @@
+# TeleMem configuration using MiniMax M2.7 as the LLM provider
+#
+# MiniMax provides an OpenAI-compatible API at https://api.minimax.io/v1
+# Get your API key at: https://api.minimax.io
+#
+# Note: MiniMax does not offer a public embedding API.
+# Configure a separate embedding service (e.g. OpenAI) for the embedder section.
+
+llm:
+  provider: openai
+  config:
+    model: MiniMax-M2.7
+    openai_base_url: https://api.minimax.io/v1
+    api_key: your-minimax-api-key  # or export MINIMAX_API_KEY and set to os.getenv("MINIMAX_API_KEY")
+    temperature: 0.7  # MiniMax requires temperature in (0.0, 1.0]
+
+embedder:
+  provider: openai
+  config:
+    model: text-embedding-3-small
+    openai_base_url: https://api.openai.com/v1
+    api_key: your-openai-api-key  # Required for embeddings (MiniMax has no embedding API)
+
+vector_store:
+  provider: faiss
+  config:
+    collection_name: telemem
+    path: db/faiss_db
+
+history_db_path: db/history.db
+
+buffer_size: 64
+similarity_threshold: 0.95
