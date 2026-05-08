@@ -211,12 +211,15 @@ results = memory.search("What transportation did Jordan use to go to work today?
 print(results)
 ```
 
-默认情况下，`Memory()` 会自动配置以下组件：
-- 使用 OpenAI 的 gpt-4.1-nano-2025-04-14 模型进行摘要提取与更新  
-- 使用 OpenAI 的 text-embedding-3-small 嵌入模型（1536 维）  
-- 使用 Faiss 向量存储，并将数据保存在磁盘上  
+`Memory()` 会使用 `mem0ai` 继承而来的默认 provider 配置。如果需要使用本仓库提供的本地 Qwen + FAISS 配置，请显式加载 `config/config.yaml`：
 
-如果需要自定义配置，请修改 `config/config.yaml` 文件。
+```python
+from telemem.utils import load_config
+import telemem as mem0
+
+config = load_config("config/config.yaml")
+memory = mem0.Memory(config=config)
+```
 
 ---
 
@@ -228,31 +231,23 @@ print(results)
 ```
 telemem/
 ├── assets/                   # 文档资源与插图素材
-├── vendor/
-│   └── mem0/                 # 上游 Mem0 仓库源代码（通过 git subtree 引入）
-├── overlay/
-│   └── patches/              # TeleMem 自定义补丁文件（.patch），用于扩展与修改上游代码
-├── scripts/                  # Overlay 管理与自动化脚本
-│   ├── init_upstream.sh      # 初始化上游 subtree 仓库
-│   ├── update_upstream.sh    # 同步上游更新并重新应用 TeleMem 补丁
-│   ├── record_patch.sh       # 将本地代码修改记录为可复现的补丁文件
-│   └── apply_patches.sh      # 应用补丁构建 TeleMem 完整代码
 ├── baselines/                # 对比评测使用的基线方法实现
 │   ├── RAG                   # Retrieval-Augmented Generation（检索增强生成）基线
 │   ├── MemoBase              # MemoBase 记忆管理系统
 │   ├── MOOM                  # MOOM 双分支叙事记忆框架
 │   ├── A-mem                 # A-mem 智能体记忆系统基线
 │   └── Mem0                  # Mem0 基线实现
+├── config/
+│   ├── config.yaml           # TeleMem 默认配置
+│   └── config.minimax.yaml   # MiniMax provider 示例配置
 ├── data/                     # 用于评测或演示的小规模示例数据集
 ├── examples/                 # 示例代码与教程 Demo
 │   ├── quickstart.py         # 快速入门示例（文本记忆）
 │   └── quickstart_mm.py      # 快速入门示例（多模态记忆）
-├── docs/                     # 项目文档、教程与开发者指南
-│   ├── TeleMem-Overlay.md    # Overlay 开发指南（英文版）
-│   └── TeleMem-Overlay-ZH.md # Overlay 开发指南（中文版）
+├── docs/                     # 项目文档
+│   └── TeleMem_Tech_Report.pdf
 ├── telemem/                  # TeleMem 源码实现
 ├── tests/                    # TeleMem 测试
-├── PATCHES.md                # TeleMem 补丁列表及功能说明
 ├── README.md                 # 项目说明文档（英文版）
 ├── README-ZH.md              # 项目说明文档（中文版）
 └── pyproject.toml            # TeleMem 环境配置
@@ -359,12 +354,9 @@ def search(
 def add_mm(
     self,
     video_path: str,
-    *,
-    frames_root: str = "video/frames",
-    captions_root: str = "video/captions",
-    vdb_root: str = "video/vdb",
-    clip_secs: int = None,
-    emb_dim: int = None,
+    output_dir: str,
+    clip_secs: int | None = None,
+    emb_dim: int | None = None,
     subtitle_path: str | None = None,
 )
 ```
@@ -374,10 +366,8 @@ def add_mm(
 | 参数名 | 类型 | 是否必填 | 说明 |
 |--------|------|----------|------|
 | video_path | str | ✅ 是 | 源视频文件路径，如 `"video/3EQLFHRHpag.mp4"` |
-| frames_root | str | ❌ 否 | 帧输出根目录（默认 `"video/frames"`） |
-| captions_root | str | ❌ 否 | 字幕 JSON 输出根目录（默认 `"video/captions"`） |
-| vdb_root | str | ❌ 否 | 向量数据库输出根目录（默认 `"video/vdb"`） |
-| clip_secs | int | ❌ 否 | 每个片段的秒数，覆盖 config.CLIP_SECS |
+| output_dir | str | ✅ 是 | 输出根目录；产物会写入其下的 `frames/`、`captions/` 和 `vdb/` 子目录 |
+| clip_secs | int | ❌ 否 | 预留参数；当前片段长度从 `config.vlm["CLIP_SECS"]` 读取 |
 | emb_dim | int | ❌ 否 | Embedding 维度，默认从配置读取 |
 | subtitle_path | str | ❌ 否 | 字幕文件路径（.srt），可选 |
 
@@ -393,10 +383,7 @@ def add_mm(
 
 ```python
 {
-    "video_name": "3EQLFHRHpag",
-    "frames_dir": "data/samples/video/frames/3EQLFHRHpag/frames",
-    "caption_json": "data/samples/video/captions/3EQLFHRHpag/captions.json",
-    "vdb_json": "data/samples/video/vdb/3EQLFHRHpag/3EQLFHRHpag_vdb.json"
+    "output_dir": "/abs/path/to/output_dir"
 }
 ```
 
@@ -408,8 +395,7 @@ def add_mm(
 def search_mm(
     self,
     question: str,
-    video_db_path: str = "video/vdb/3EQLFHRHpag_vdb.json",
-    video_caption_path: str = "video/captions/captions.json",
+    output_dir: str,
     max_iterations: int = 15,
 )
 ```
@@ -419,8 +405,7 @@ def search_mm(
 | 参数名 | 类型 | 是否必填 | 说明 |
 |--------|------|----------|------|
 | question | str | ✅ 是 | 问题字符串（支持 A/B/C/D 多选题格式） |
-| video_db_path | str | ❌ 否 | 视频向量数据库路径 |
-| video_caption_path | str | ❌ 否 | 视频字幕 JSON 路径 |
+| output_dir | str | ✅ 是 | 与 `add_mm` 相同的输出根目录；其中必须正好包含一个 `captions/*/captions.json` 和一个 `vdb/*/*_vdb.json` |
 | max_iterations | int | ❌ 否 | MMCoreAgent 最大推理轮数（默认 15） |
 
 #### 🛠️ ReAct 风格推理工具
@@ -443,29 +428,30 @@ def search_mm(
 python examples/quickstart_mm.py
 ```
 
-首次运行会在 `output_dir`（默认 `data/samples/video/`）下生成所有帧、字幕、VDB JSON。为方便复现，我们也在仓库中附带了这些中间量，可直接用于查询，无需重新计算。
+首次运行会在指定的 `output_dir` 下生成帧、字幕和 VDB JSON。仓库中只附带了一个小型示例视频；除非本地已有这些中间产物，否则生成字幕和视频数据库仍需要配置可用的 VLM 与 embedding 服务。
 
 完整代码示例：
 
 ```python
 import telemem as mem0
-import os
+from pathlib import Path
+from telemem.mm_utils.core import extract_choice_from_msg
 
 # 初始化模型
 memory = mem0.Memory()
 
 # 定义路径
-video_path = "video/3EQLFHRHpag.mp4"
-video_name = os.path.splitext(os.path.basename(video_path))[0]
-output_dir = "video"
-os.makedirs(output_dir, exist_ok=True)
+repo_root = Path(__file__).resolve().parents[1]
+video_path = repo_root / "data" / "samples" / "video" / "3EQLFHRHpag.mp4"
+video_name = video_path.stem
+output_dir = video_path.parent
 
 # 第一步：写入记忆
-vdb_json_path = f"{output_dir}/vdb/{video_name}/{video_name}_vdb.json"
-if not os.path.exists(vdb_json_path):
+vdb_json_path = output_dir / "vdb" / video_name / f"{video_name}_vdb.json"
+if not vdb_json_path.exists():
     result = memory.add_mm(
-        video_path=video_path,
-        output_dir=output_dir,
+        video_path=str(video_path),
+        output_dir=str(output_dir),
     )
     print(f"Video processing complete: {result}")
 else:
@@ -482,12 +468,11 @@ question = """The problems people encounter in the video are caused by what?
 # 第三步：检索记忆
 messages = memory.search_mm(
     question=question,
-    output_dir=output_dir,
+    output_dir=str(output_dir),
     max_iterations=15,
 )
 
 # 提取最终答案
-from core import extract_choice_from_msg
 answer = extract_choice_from_msg(messages)
 print(f"Answer: ({answer})")
 ```
@@ -573,7 +558,7 @@ video/
 ------
 ## 开发与贡献
 
-* 叠加（Overlay）开发模式说明：[TeleMem-Overlay-ZH.md](docs/TeleMem-Overlay-ZH.md)
+* 欢迎提交 issue 和 pull request。
 * 英文文档：[README.md](README.md)
 
 ---

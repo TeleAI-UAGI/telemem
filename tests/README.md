@@ -28,11 +28,8 @@ python3 test_basic.py
 pytest tests/test_basic.py -v
 ```
 
-**预期输出**：
-```
-✅ 所有基础测试通过！
-通过: 7/7
-```
+**说明**：
+`test_basic.py` 覆盖的是包导出、配置、实例化与 mm_utils 导入等接口一致性。若这些测试失败，优先检查 `telemem/__init__.py` 的顶层导出以及默认配置是否与测试预期一致。
 
 ---
 
@@ -74,7 +71,7 @@ cd /path/to/telemem
 python3 tests/test_basic.py
 ```
 
-如果看到 `✅ 所有基础测试通过！`，说明包安装正确。
+如果测试失败，请根据失败项检查包导出、配置或运行环境；该测试不依赖 API key。
 
 ### 步骤 2：运行完整测试（需要 API key）
 
@@ -279,11 +276,11 @@ print(f"添加 100 条记忆耗时: {end - start:.2f} 秒")
 
 如果测试失败，请提供：
 1. Python 版本：`python3 --version`
-2. 包版本：`python3 -c "import telemem; print(telemem.__version__)"`
+2. 包路径：`python3 -c "import telemem; print(telemem.__file__)"`
 3. 完整错误信息
 4. 操作系统信息
 
 ---
 
-**最后更新**: 2025-01-05
-**测试状态**: ✅ 所有基础测试通过
+**最后更新**: 2026-05-08
+**测试状态**: 以本地运行结果为准

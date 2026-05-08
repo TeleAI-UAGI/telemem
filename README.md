@@ -207,12 +207,15 @@ results = memory.search("What transportation did Jordan use to go to work today?
 print(results)
 ```
 
-By default `Memory()` wires up:
-- OpenAI gpt-4.1-nano-2025-04-14 for summary extraction and updates
-- OpenAI text-embedding-3-small embeddings (1536 dimensions)
-- Faiss vector store with on-disk data
+`Memory()` uses the default provider settings inherited from `mem0ai`. To use the repository's local Qwen + FAISS configuration, load `config/config.yaml` explicitly:
 
-If you want to customize the configuration, please modify `config/config.yaml`.
+```python
+from telemem.utils import load_config
+import telemem as mem0
+
+config = load_config("config/config.yaml")
+memory = mem0.Memory(config=config)
+```
 
 ### Using MiniMax as the LLM Provider
 
@@ -247,15 +250,6 @@ Key points for MiniMax usage:
 ```
 telemem/
 ├── assets/                 # Documentation assets and figures
-├── vendor/
-│ └── mem0/                 # Upstream repository source code
-├── overlay/
-│ └── patches/              # TeleMem custom patch files (.patch)
-├── scripts/                # Overlay management scripts
-│ ├── init_upstream.sh      # Initialize upstream subtree
-│ ├── update_upstream.sh    # Sync upstream and reapply patches
-│ ├── record_patch.sh       # Record local modifications as patches
-│ └── apply_patches.sh      # Apply patches
 ├── baselines/              # Baseline implementations for comparative evaluation
 │ ├── RAG                   # Retrieval-Augmented Generation baseline
 │ ├── MemoBase              # MemoBase memory management system
@@ -263,17 +257,16 @@ telemem/
 │ ├── A-mem                 # A-mem agent memory baseline
 │ └── Mem0                  # Mem0 baseline implementation
 ├── config/               
-| └── config.yaml           # TeleMem configuration
+│ ├── config.yaml           # TeleMem default configuration
+│ └── config.minimax.yaml   # MiniMax provider example configuration
 ├── data/                   # Small sample datasets for evaluation or demonstration
 ├── examples/               # Code examples and tutorial demos
 │ ├── quickstart.py         # Quick start
-│ └── quickstart_mm.py      # Quick start(Multimodel)
+│ └── quickstart_mm.py      # Quick start (multimodal)
 ├── docs/
-│ ├── TeleMem-Overlay.md    # Overlay development guide (English)
-│ └── TeleMem-Overlay-ZH.md # Overlay development guide (Chinese)
+│ └── TeleMem_Tech_Report.pdf
 ├── telemem/                # Telemem code
 ├── tests/                  # Telemem test
-├── PATCHES.md              # Patch list and descriptions
 ├── README.md               # English README
 ├── README-ZH.md            # Chinese README
 └── pyproject.toml          # Python environment
@@ -378,12 +371,9 @@ Beyond text memory, TeleMem further extends multimodal capabilities. Drawing ins
 def add_mm(
     self,
     video_path: str,
-    *,
-    frames_root: str = "video/frames",
-    captions_root: str = "video/captions",
-    vdb_root: str = "video/vdb",
-    clip_secs: int = None,
-    emb_dim: int = None,
+    output_dir: str,
+    clip_secs: int | None = None,
+    emb_dim: int | None = None,
     subtitle_path: str | None = None,
 )
 ```
@@ -393,10 +383,8 @@ def add_mm(
 | Parameter | Type | Required | Description |
 |--------|------|----------|------|
 | video_path | str | ✅ Yes | Source video file path, e.g., `"video/3EQLFHRHpag.mp4"` |
-| frames_root | str | ❌ No | Frame output root directory (default `"video/frames"`) |
-| captions_root | str | ❌ No | Caption JSON output root directory (default `"video/captions"`) |
-| vdb_root | str | ❌ No | Vector database output root directory (default `"video/vdb"`) |
-| clip_secs | int | ❌ No | Seconds per clip, overrides config.CLIP_SECS |
+| output_dir | str | ✅ Yes | Root output directory. Artifacts are written under `frames/`, `captions/`, and `vdb/` subdirectories |
+| clip_secs | int | ❌ No | Reserved parameter; clip length is currently read from `config.vlm["CLIP_SECS"]` |
 | emb_dim | int | ❌ No | Embedding dimension, reads from config by default |
 | subtitle_path | str | ❌ No | Subtitle file path (.srt), optional |
 
@@ -412,10 +400,7 @@ def add_mm(
 
 ```python
 {
-    "video_name": "3EQLFHRHpag",
-    "frames_dir": "video/frames/3EQLFHRHpag/frames",
-    "caption_json": "video/captions/3EQLFHRHpag/captions.json",
-    "vdb_json": "video/vdb/3EQLFHRHpag/3EQLFHRHpag_vdb.json"
+    "output_dir": "/abs/path/to/output_dir"
 }
 ```
 
@@ -427,8 +412,7 @@ def add_mm(
 def search_mm(
     self,
     question: str,
-    video_db_path: str = "video/vdb/3EQLFHRHpag_vdb.json",
-    video_caption_path: str = "video/captions/captions.json",
+    output_dir: str,
     max_iterations: int = 15,
 )
 ```
@@ -438,8 +422,7 @@ def search_mm(
 | Parameter | Type | Required | Description |
 |--------|------|----------|------|
 | question | str | ✅ Yes | Question string (supports A/B/C/D multiple choice format) |
-| video_db_path | str | ❌ No | Video vector database path |
-| video_caption_path | str | ❌ No | Video caption JSON path |
+| output_dir | str | ✅ Yes | The same root output directory used by `add_mm`; it must contain exactly one `captions/*/captions.json` and one `vdb/*/*_vdb.json` |
 | max_iterations | int | ❌ No | Maximum MMCoreAgent reasoning iterations (default 15) |
 
 #### 🛠️ ReAct-Style Reasoning Tools
@@ -462,30 +445,31 @@ Run the multimodal demo:
 python examples/quickstart_mm.py
 ```
 
-On the first run, all frames, captions and VDB JSON will be generated under `output_dir` (default `data/samples/video/`). For reproducibility, we also ship these intermediates in the repo so you can run queries directly without recomputing.
+On the first run, frames, captions and VDB JSON will be generated under the chosen `output_dir`. The repository ships a small sample video; generating captions and the video database still requires configured VLM and embedding services unless you already have these artifacts locally.
 
 Complete code example:
 
 ```python
 import telemem as mem0
-import os
+from pathlib import Path
+from telemem.mm_utils.core import extract_choice_from_msg
 
 # Initialize
 memory = mem0.Memory()
 
 # Define paths
-video_path = "data/samples/video/3EQLFHRHpag.mp4"
-video_name = os.path.splitext(os.path.basename(video_path))[0]
-output_dir = "data/samples/video"
-os.makedirs(output_dir, exist_ok=True)
+repo_root = Path(__file__).resolve().parents[1]
+video_path = repo_root / "data" / "samples" / "video" / "3EQLFHRHpag.mp4"
+video_name = video_path.stem
+output_dir = video_path.parent
 
 
 # Step 1: Add video to memory (auto-processing)
-vdb_json_path = f"{output_dir}/vdb/{video_name}/{video_name}_vdb.json"
-if not os.path.exists(vdb_json_path):
+vdb_json_path = output_dir / "vdb" / video_name / f"{video_name}_vdb.json"
+if not vdb_json_path.exists():
     result = memory.add_mm(
-        video_path=video_path,
-        output_dir=output_dir,
+        video_path=str(video_path),
+        output_dir=str(output_dir),
     )
     print(f"Video processing complete: {result}")
 else:
@@ -501,12 +485,11 @@ question = """The problems people encounter in the video are caused by what?
 
 messages = memory.search_mm(
     question=question,
-    output_dir=output_dir,
+    output_dir=str(output_dir),
     max_iterations=15,
 )
 
 # Extract final answer
-from core import extract_choice_from_msg
 answer = extract_choice_from_msg(messages)
 print(f"Answer: ({answer})")
 ```
@@ -593,7 +576,7 @@ video/
 
 ## Development and Contribution
 
-* Overlay development process: [TeleMem-Overlay.md](docs/TeleMem-Overlay.md)
+* Issues and pull requests are welcome.
 * Chinese documentation: [README-ZH.md](README-ZH.md)
 
 ---
@@ -634,7 +617,3 @@ Made with ❤️ by the Ubiquitous AGI team at TeleAI.
   &nbsp;&nbsp;&nbsp;
   <img src="assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
 </div>
-
-
-
-

@@ -1,22 +1,27 @@
-import vendor.TeleMem as mem0
-import os
+from pathlib import Path
+
+import telemem as mem0
+from telemem.mm_utils.core import extract_choice_from_msg
 
 # Initialize
 memory = mem0.Memory()
 
 # Define paths
-video_path = "data/samples/video/3EQLFHRHpag.mp4"
-video_name = os.path.splitext(os.path.basename(video_path))[0]
+repo_root = Path(__file__).resolve().parents[1]
+video_path = repo_root / "data" / "samples" / "video" / "3EQLFHRHpag.mp4"
+video_name = video_path.stem
+output_dir = video_path.parent
 
 # Step 1: Add video to memory (auto-processing)
-if not os.path.exists(f"video/vdb/{video_name}/{video_name}_vdb.json"):
+vdb_json_path = output_dir / "vdb" / video_name / f"{video_name}_vdb.json"
+if not vdb_json_path.exists():
     result = memory.add_mm(
-        video_path=video_path,
-        frames_root="video/frames",
-        captions_root="video/captions",
-        vdb_root="video/vdb",
+        video_path=str(video_path),
+        output_dir=str(output_dir),
     )
     print(f"Video processing complete: {result}")
+else:
+    print(f"VDB already exists: {vdb_json_path}")
 
 # Step 2: Query video content
 question = """The problems people encounter in the video are caused by what?
@@ -28,12 +33,10 @@ question = """The problems people encounter in the video are caused by what?
 
 messages = memory.search_mm(
     question=question,
-    video_db_path=f"vendor/TeleMem/video/vdb/{video_name}/{video_name}_vdb.json",
-    video_caption_path=f"vendor/TeleMem/video/captions/{video_name}/captions.json",
+    output_dir=str(output_dir),
     max_iterations=15,
 )
 
 # Extract final answer
-from core import extract_choice_from_msg
 answer = extract_choice_from_msg(messages)
 print(f"Answer: ({answer})")
