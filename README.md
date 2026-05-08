@@ -217,6 +217,12 @@ config = load_config("config/config.yaml")
 memory = mem0.Memory(config=config)
 ```
 
+The runnable examples also honor the same configuration through `TELEMEM_CONFIG`:
+
+```shell
+TELEMEM_CONFIG=config/config.yaml python examples/quickstart.py
+```
+
 ### Using MiniMax as the LLM Provider
 
 TeleMem supports [MiniMax](https://api.minimax.io) as an LLM backend via its OpenAI-compatible API.

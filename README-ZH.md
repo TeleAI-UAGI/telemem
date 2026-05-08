@@ -221,6 +221,12 @@ config = load_config("config/config.yaml")
 memory = mem0.Memory(config=config)
 ```
 
+可运行的 examples 也支持通过 `TELEMEM_CONFIG` 指定同一配置：
+
+```shell
+TELEMEM_CONFIG=config/config.yaml python examples/quickstart.py
+```
+
 ---
 
 ## 项目结构
