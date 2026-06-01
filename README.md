@@ -242,7 +242,7 @@ memory = mem0.Memory(config=config)
 ```
 
 Key points for MiniMax usage:
-- **LLM**: MiniMax M2.7 / M2.7-highspeed (204K context) via `https://api.minimax.io/v1`
+- **LLM**: MiniMax M3 (512K context, default) via `https://api.minimax.io/v1`; MiniMax M2.7 / M2.7-highspeed (204K context) remain available as alternatives
 - **Temperature**: must be in **(0.0, 1.0]** — set explicitly (e.g. `0.7`) to avoid out-of-range errors
 - **Embeddings**: MiniMax does not provide a public embedding API; configure a separate embedder (e.g. `text-embedding-3-small`) in the `embedder` section
 
