@@ -1,4 +1,4 @@
-# TeleMem configuration using MiniMax M2.7 as the LLM provider
+# TeleMem configuration using MiniMax M3 as the LLM provider
 #
 # MiniMax provides an OpenAI-compatible API at https://api.minimax.io/v1
 # Get your API key at: https://api.minimax.io
@@ -9,7 +9,7 @@
 llm:
   provider: openai
   config:
-    model: MiniMax-M2.7
+    model: MiniMax-M3
     openai_base_url: https://api.minimax.io/v1
     api_key: your-minimax-api-key  # or export MINIMAX_API_KEY and set to os.getenv("MINIMAX_API_KEY")
     temperature: 0.7  # MiniMax requires temperature in (0.0, 1.0]

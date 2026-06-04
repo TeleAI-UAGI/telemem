@@ -25,6 +25,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 MINIMAX_BASE_URL = "https://api.minimax.io/v1"
+MINIMAX_MODEL_M3 = "MiniMax-M3"
 MINIMAX_MODEL_M2_7 = "MiniMax-M2.7"
 MINIMAX_MODEL_M2_7_HS = "MiniMax-M2.7-highspeed"
 MINIMAX_TEMPERATURE_MIN = 0.0
@@ -115,7 +116,7 @@ class TestMiniMaxTeleMemoryConfig(unittest.TestCase):
             "llm": {
                 "provider": "openai",
                 "config": {
-                    "model": MINIMAX_MODEL_M2_7,
+                    "model": MINIMAX_MODEL_M3,
                     "openai_base_url": MINIMAX_BASE_URL,
                     "api_key": "sk-test-minimax",
                     "temperature": 0.7,
@@ -161,7 +162,7 @@ class TestMiniMaxTeleMemoryConfig(unittest.TestCase):
         from telemem.configs import TeleMemoryConfig
         cfg_dict = self._make_minimax_config_dict()
         config = TeleMemoryConfig(**cfg_dict)
-        self.assertEqual(config.llm.config["model"], MINIMAX_MODEL_M2_7)
+        self.assertEqual(config.llm.config["model"], MINIMAX_MODEL_M3)
 
     def test_minimax_temperature_preserved_in_config(self):
         """Temperature value must be preserved in the LLM config."""
@@ -211,10 +212,9 @@ class TestMiniMaxModels(unittest.TestCase):
     """Validate MiniMax model names and expected properties."""
 
     MINIMAX_MODELS = [
+        {"name": "MiniMax-M3", "context": 524288},
         {"name": "MiniMax-M2.7", "context": 204800},
         {"name": "MiniMax-M2.7-highspeed", "context": 204800},
-        {"name": "MiniMax-M2.5", "context": 204800},
-        {"name": "MiniMax-M2.5-highspeed", "context": 204800},
     ]
 
     def test_model_names_start_with_minimax(self):
@@ -223,16 +223,16 @@ class TestMiniMaxModels(unittest.TestCase):
             with self.subTest(model=model["name"]):
                 self.assertTrue(model["name"].startswith("MiniMax-"))
 
-    def test_all_models_have_204k_context(self):
-        """All listed MiniMax models have 204K context window."""
+    def test_all_models_have_long_context(self):
+        """All listed MiniMax models have at least a 204K context window."""
         for model in self.MINIMAX_MODELS:
             with self.subTest(model=model["name"]):
-                self.assertEqual(model["context"], 204800)
+                self.assertGreaterEqual(model["context"], 204800)
 
     def test_preferred_model_for_config(self):
-        """MiniMax-M2.7 is the preferred default model."""
-        default_model = MINIMAX_MODEL_M2_7
-        self.assertEqual(default_model, "MiniMax-M2.7")
+        """MiniMax-M3 is the preferred default model."""
+        default_model = MINIMAX_MODEL_M3
+        self.assertEqual(default_model, "MiniMax-M3")
 
 
 @unittest.skipUnless(os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set")
@@ -247,7 +247,7 @@ class TestMiniMaxIntegration(unittest.TestCase):
         from openai import OpenAI
         client = OpenAI(base_url=MINIMAX_BASE_URL, api_key=self.api_key)
         response = client.chat.completions.create(
-            model=MINIMAX_MODEL_M2_7,
+            model=MINIMAX_MODEL_M3,
             messages=[{"role": "user", "content": "Reply with the single word: OK"}],
             max_tokens=10,
             temperature=0.7,
@@ -262,7 +262,7 @@ class TestMiniMaxIntegration(unittest.TestCase):
         from openai import OpenAI
         client = OpenAI(base_url=MINIMAX_BASE_URL, api_key=self.api_key)
         response = client.chat.completions.create(
-            model=MINIMAX_MODEL_M2_7,
+            model=MINIMAX_MODEL_M3,
             messages=[
                 {"role": "user", "content": (
                     "Return a JSON object with a single key 'status' set to 'ok'. "
