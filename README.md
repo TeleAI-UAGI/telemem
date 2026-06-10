@@ -614,12 +614,12 @@ TeleMem’s development has been deeply inspired by open-source communities and 
 
 **If you find this project helpful, please give us a ⭐️.**
 
-Made with ❤️ by the Ubiquitous AGI team at TeleAI.
+Made with ❤️ by [Bloo-Mind AI Ltd](https://www.bloo-mind.ai/) and the Ubiquitous AGI team at TeleAI.
 
 </div>
 
 <div align="center" style="margin-top: 10px;">
-  <img src="assets/TeleAI.png" alt="TeleAI Logo" height="120px" />
-  &nbsp;&nbsp;&nbsp;
-  <img src="assets/TeleMem.png" alt="TeleMem Logo" height="120px" />
-</div>
+    <a href="https://www.bloo-mind.ai/"><img src="assets/bloo-mind.png" alt="Bloo-Mind Logo" width="120px" /></a>
+    &nbsp;&nbsp;&nbsp;
+    <img src="assets/TeleAI.png" alt="TeleAI Logo" width="120px" />
+</div> 
