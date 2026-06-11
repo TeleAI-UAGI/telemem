@@ -40,5 +40,8 @@ Documentation = "https://github.com/TeleAI-UAGI/telemem#readme"
 [tool.hatch.version]
 path = "telemem/__init__.py"
 
+[tool.hatch.build.targets.sdist]
+only-include = ["telemem", "config", "examples", "tests", "requirements.txt"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["telemem"]
