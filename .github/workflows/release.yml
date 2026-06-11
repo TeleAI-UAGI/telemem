@@ -1,0 +1,58 @@
+name: Release
+
+# Publishes to PyPI when a version tag (v1.5.0, v2.0.0, ...) is pushed.
+#
+# Uses PyPI "trusted publishing" (OIDC) — no API token stored in GitHub.
+# One-time setup (requires owner/maintainer access to the `telemem` project
+# on PyPI): https://pypi.org/manage/project/telemem/settings/publishing/
+#   - Owner: TeleAI-UAGI   Repository: telemem
+#   - Workflow name: release.yml   Environment: pypi
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Verify tag matches package version
+        run: |
+          PKG_VERSION=$(uv run --no-project python -c "import re,pathlib;print(re.search(r'__version__ = \"(.+?)\"', pathlib.Path('telemem/__init__.py').read_text()).group(1))")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match telemem.__version__ ($PKG_VERSION)" >&2
+            exit 1
+          fi
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Check metadata
+        run: uvx twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # required for PyPI trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
