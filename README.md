@@ -176,6 +176,15 @@ Memory capability was assessed via QA benchmarks, e.g.:
 
 ### Environment Preparation
 
+Using [uv](https://docs.astral.sh/uv/) (recommended — creates `.venv` from the committed `uv.lock` for a reproducible environment):
+
+```shell
+uv sync --all-extras   # install TeleMem (editable) + all extras, incl. MCP
+uv run python examples/quickstart.py
+```
+
+Or with conda + pip:
+
 ```shell
 # Create and activate virtual environment
 conda create -n telemem python=3.10

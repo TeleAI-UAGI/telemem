@@ -180,6 +180,15 @@ TeleMem 相比于 Mem0 针对 **角色化、长期化、高性能** 核心需求
 
 ### 环境准备
 
+使用 [uv](https://docs.astral.sh/uv/)（推荐——基于已提交的 `uv.lock` 创建 `.venv`，环境可复现）：
+
+```shell
+uv sync --all-extras   # 以可编辑模式安装 TeleMem 及全部 extras（含 MCP）
+uv run python examples/quickstart.py
+```
+
+或使用 conda + pip：
+
 ```shell
 # 创建并激活虚拟环境
 conda create -n telemem python=3.10
