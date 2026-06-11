@@ -10,6 +10,9 @@
   <a href="docs/TeleMem_Tech_Report.pdf">
     <img src="https://img.shields.io/badge/arXiv-Paper-red" alt="arXiv">
   </a>
+  <a href="https://github.com/TeleAI-UAGI/telemem/actions/workflows/ci.yml">
+    <img src="https://github.com/TeleAI-UAGI/telemem/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
   <a href="https://github.com/TeleAI-UAGI/telemem">
     <img src="https://img.shields.io/github/stars/TeleAI-UAGI/TeleMem?style=social" alt="GitHub Stars">
   </a>
@@ -50,6 +53,13 @@ TeleMem是一个大模型智能体的长期记忆管理系统，面向**多轮�
 TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深谋远虑(foresight)_ 。
 
 **TeleMem，使记忆持续、让智慧生长。**
+
+### 为什么选择 TeleMem？
+
+- 🎭 **真正的角色记忆** — 唯一自动为每个角色建立**独立记忆档案**的开源记忆系统，专为角色扮演、陪伴 AI、NPC 和多角色助手设计。
+- 🎬 **视频记忆，而不止文本** — 完整的视频 → 帧 → 字幕 → 向量库流水线，支持 **ReAct 风格多步视频问答**。
+- 🏠 **默认完全本地化** — 可在自有硬件上端到端运行（Qwen + FAISS）；无云服务、无付费档位、数据不出本机。
+- 🔌 **mem0 兼容 API** — `add()` / `search()` 接受相同参数并返回相同的 `{"results": [...]}` 结构，现有 Mem0 代码无需修改。
 
 ---
 
@@ -95,6 +105,18 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 ## 项目介绍
 
 TeleMem 通过一套深度优化的**角色化摘要生成 → 语义聚类去重 → 高效存储 → 精准检索**的完整流程，使对话式 AI 在长周期交互中能够保持稳定、自然、连续的世界观与角色设定。
+
+```mermaid
+flowchart LR
+    A["对话消息"] --> B["角色感知摘要<br/>（全局 + 各角色视角）"]
+    B --> C["向量化 +<br/>相似记忆检索"]
+    C --> D["写入缓冲区<br/>（批量刷新）"]
+    D --> E["LLM 语义聚类<br/>与融合"]
+    E --> F[("FAISS 索引 +<br/>JSON 元数据")]
+    Q["查询"] --> S["向量检索<br/>+ 重排序"]
+    F --> S
+    S --> R["results"]
+```
 
 ### 功能
 
@@ -198,6 +220,14 @@ conda activate telemem
 pip install -e .
 ```
 
+可选 extras——核心安装是轻量级的（仅文本记忆），按需安装：
+
+```shell
+pip install -e ".[mcp]"     # Model Context Protocol 服务器（telemem-mcp）
+pip install -e ".[video]"   # 视频/多模态流水线（opencv、yt-dlp 等）
+pip install -e ".[all]"     # 全部安装
+```
+
 ### 示例
 
 设置OpenAI API key
@@ -219,7 +249,8 @@ messages = [
 
 memory.add(messages=messages, user_id="Jordan")
 results = memory.search("What transportation did Jordan use to go to work today?", user_id="Jordan")
-print(results)
+for hit in results["results"]:   # 与 mem0 相同的返回结构
+    print(hit["memory"])
 ```
 
 `Memory()` 会使用 `mem0ai` 继承而来的默认 provider 配置。如果需要使用本仓库提供的本地 Qwen + FAISS 配置，请显式加载 `config/config.yaml`：
@@ -296,20 +327,25 @@ def add(
     infer: bool = True,
     memory_type: Optional[str] = None,
     prompt: Optional[str] = None,
+    batch: bool = False,
 )
 ```
 
 #### 🔎 参数说明
 
 
-| 参数名                     | 类型                 | 是否必填 | 说明                                                                       |
-| -------------------------- | -------------------- | -------- | -------------------------------------------------------------------------- |
-| messages                   | List[Dict[str, str]] | ✅ 是    | 对话消息列表，每条包含role（user/assistant）和content                      |
-| metadata                   | Dict[str, Any]       | ✅ 是    | 元数据字典，必须包含：<br/>・sample\_id：会话唯一标识<br/>・user：角色列表 |
-| user\_id/agent\_id/run\_id | Optional[str]        | ❌ 否    | Mem0 兼容参数，TeleMem 中可传 None                                       |
-| infer                      | bool                 | ❌ 否    | 是否自动生成记忆摘要（默认 True）                                          |
-| memory\_type               | Optional[str]        | ❌ 否    | 记忆类型标识（默认自动分类）                                               |
-| prompt                     | Optional[str]        | ❌ 否    | 自定义摘要生成 Prompt（默认使用优化版 Prompt）                             |
+| 参数名               | 类型                          | 是否必填 | 说明                                                                       |
+| -------------------- | ----------------------------- | -------- | -------------------------------------------------------------------------- |
+| messages             | str 或 List[Dict[str, str]]   | ✅ 是    | 单条文本，或对话消息列表（每条包含 role（user/assistant）和 content）       |
+| user\_id             | Optional[str]                 | ❌ 否    | 记忆归属的角色/用户；TeleMem 会为每个 user\_id 维护**独立记忆档案**。省略则存为共享的会话事件记忆 |
+| agent\_id / run\_id  | Optional[str]                 | ❌ 否    | 其他 mem0 兼容作用域（如每个会话一个 run\_id）                              |
+| metadata             | Optional[Dict[str, Any]]      | ❌ 否    | 随记忆存储的任意元数据                                                      |
+| infer                | bool                          | ❌ 否    | 是否自动生成记忆摘要（默认 True）                                          |
+| memory\_type         | Optional[str]                 | ❌ 否    | 记忆类型标识（默认自动分类）                                               |
+| prompt               | Optional[str]                 | ❌ 否    | 自定义摘要生成 Prompt（默认使用优化版 Prompt）                             |
+| batch                | bool                          | ❌ 否    | 走高吞吐批处理流水线（等价于 `add_batch`）                                  |
+
+**返回值**为 mem0 兼容结构：`{"results": [{"id": "...", "memory": "...", "event": "ADD"}, ...]}`
 
 #### 🔁 add() 内部流程
 
@@ -336,7 +372,7 @@ def search(
     user_id: Optional[str] = None,
     agent_id: Optional[str] = None,
     run_id: Optional[str] = None,
-    limit: int = 5,
+    limit: int = 100,
     filters: Optional[Dict[str, Any]] = None,
     threshold: Optional[float] = None,
     rerank: bool = True,
@@ -346,15 +382,17 @@ def search(
 #### 🔎 参数说明
 
 
-| 参数名             | 类型           | 是否必填 | 说明                                      |
-| ------------------ | -------------- | -------- | ----------------------------------------- |
-| query              | str            | ✅ 是    | 检索查询文本（自然语言问题）              |
-| run\_id            | str            | ✅ 是    | 会话标识，必须与 add 时的 sample\_id 一致 |
-| limit              | int            | ❌ 否    | 返回记忆条数上限（默认 5 条）             |
-| threshold          | float          | ❌ 否    | 相似度阈值（0-1，默认自动适配）           |
-| filters            | Dict[str, Any] | ❌ 否    | 自定义过滤条件（如角色、时间范围）        |
-| rerank             | bool           | ❌ 否    | 是否对检索结果重排序（默认 True）         |
-| user\_id/agent\_id | Optional[str]  | ❌ 否    | Mem0 兼容参数，无实际作用                |
+| 参数名              | 类型              | 是否必填 | 说明                                      |
+| ------------------- | ----------------- | -------- | ----------------------------------------- |
+| query               | str               | ✅ 是    | 检索查询文本（自然语言问题）              |
+| user\_id            | Optional[str]     | ❌ 否    | 要检索的角色/用户档案；共享事件记忆（伪用户 `"events"`）会被一并检索 |
+| agent\_id / run\_id | Optional[str]     | ❌ 否    | 其他 mem0 兼容作用域过滤                  |
+| limit               | int               | ❌ 否    | 返回记忆条数上限（默认 100 条）           |
+| threshold           | Optional[float]   | ❌ 否    | 相似度阈值（0-1，默认自动适配）           |
+| filters             | Dict[str, Any]    | ❌ 否    | 自定义过滤条件（如角色、时间范围）        |
+| rerank              | bool              | ❌ 否    | 是否对检索结果重排序（默认 True）         |
+
+**返回值**为 mem0 兼容结构：`{"results": [{"id": "...", "memory": "...", "score": ..., ...}, ...]}`
 
 > 🔍 搜索基于 FAISS 向量检索，支持毫秒级响应。
 
@@ -505,7 +543,7 @@ print(f"Answer: ({answer})")
 TeleMem 内置 [Model Context Protocol](https://modelcontextprotocol.io)（MCP）服务器，任何兼容 MCP 的客户端——Claude Desktop、Claude Code、Cursor、自定义 Agent——都可以把 TeleMem 用作长期记忆。
 
 ```shell
-pip install "telemem[mcp]"
+pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"   # 或在源码目录中：pip install -e ".[mcp]"
 
 telemem-mcp                                      # stdio（默认）
 telemem-mcp --transport sse --port 8421          # SSE over HTTP
@@ -619,8 +657,11 @@ video/
 ------
 ## 开发与贡献
 
-* 欢迎提交 issue 和 pull request。
+* 欢迎提交 issue 和 pull request——参与方式见[贡献指南](CONTRIBUTING.md)。
+* 版本变更记录见 [Changelog](CHANGELOG.md)。
+* CI 会在 Python 3.10–3.12 上为每个 PR 运行离线测试套件（`uv run pytest tests/ -q`）。
 * 英文文档：[README.md](README.md)
+* 如在研究中使用 TeleMem，请引用[技术报告](https://arxiv.org/abs/2601.06037)（见 [CITATION.cff](CITATION.cff)）。
 
 ---
 ## 许可证

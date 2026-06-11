@@ -10,6 +10,9 @@
   <a href="https://arxiv.org/abs/2601.06037">
     <img src="https://img.shields.io/badge/arXiv-Paper-red" alt="arXiv">
   </a>
+  <a href="https://github.com/TeleAI-UAGI/telemem/actions/workflows/ci.yml">
+    <img src="https://github.com/TeleAI-UAGI/telemem/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
   <a href="https://github.com/TeleAI-UAGI/telemem">
     <img src="https://img.shields.io/github/stars/TeleAI-UAGI/TeleMem?style=social" alt="GitHub Stars">
   </a>
@@ -45,9 +48,16 @@ Through its unique **context-aware enhancement mechanism**, TeleMem provides con
 
 Building upon this foundation, TeleMem implements **video understanding, multimodal reasoning, and visual question answering** capabilities. Through a complete pipeline of video frame extraction, caption generation, and vector database construction, AI Agents can effortlessly **store, retrieve, and reason over video content** just like handling text memories.
 
-The ultimate goal of the TeleMem project is to _use an agent's hindsight to improve its foresignt_. 
+The ultimate goal of the TeleMem project is to _use an agent's hindsight to improve its foresight_. 
 
 **TeleMem, where memory lives on and intelligence grows strong.**
+
+### Why TeleMem?
+
+- 🎭 **Character memory done right** — the only open-source memory layer that automatically builds **isolated, per-character memory profiles**, built for role-play, companion AI, NPCs, and multi-persona assistants.
+- 🎬 **Memory for video, not just text** — a full video → frames → captions → vector DB pipeline with **ReAct-style multi-step video QA**.
+- 🏠 **Fully local by default** — runs end-to-end on your hardware (Qwen + FAISS); no cloud service, no paid tier, no data leaving your machine.
+- 🔌 **mem0-compatible API** — `add()` / `search()` accept the same arguments and return the same `{"results": [...]}` shapes, so existing Mem0 code keeps working.
 
 ---
 
@@ -92,6 +102,18 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 ## Project Introduction
 
 TeleMem enables conversational AI to maintain stable, natural, and continuous worldviews and character settings during long-term interactions through a deeply optimized pipeline of **character-aware summarization → semantic clustering deduplication → efficient storage → precise retrieval**.
+
+```mermaid
+flowchart LR
+    A["Dialogue<br/>messages"] --> B["Character-aware<br/>summarization<br/>(global + per-character)"]
+    B --> C["Embedding +<br/>similar-memory<br/>retrieval"]
+    C --> D["Write buffer<br/>(batch flush)"]
+    D --> E["LLM semantic<br/>clustering & fusion"]
+    E --> F[("FAISS index +<br/>JSON metadata")]
+    Q["Query"] --> S["Vector search<br/>+ rerank"]
+    F --> S
+    S --> R["results"]
+```
 
 ### Features
 
@@ -193,6 +215,14 @@ conda activate telemem
 pip install -e .
 ```
 
+Optional extras — the core install is lightweight (text memory only); pull in what you need:
+
+```shell
+pip install -e ".[mcp]"     # Model Context Protocol server (telemem-mcp)
+pip install -e ".[video]"   # video/multimodal pipeline (opencv, yt-dlp, ...)
+pip install -e ".[all]"     # everything
+```
+
 ### Example
 
 Set your OpenAI API key:
@@ -215,7 +245,8 @@ messages = [
 
 memory.add(messages=messages, user_id="Jordan")
 results = memory.search("What transportation did Jordan use to go to work today?", user_id="Jordan")
-print(results)
+for hit in results["results"]:   # same result shape as mem0
+    print(hit["memory"])
 ```
 
 `Memory()` uses the default provider settings inherited from `mem0ai`. To use the repository's local Qwen + FAISS configuration, load `config/config.yaml` explicitly:
@@ -315,19 +346,24 @@ def add(
  infer: bool = True,
  memory_type: Optional[str] = None,
  prompt: Optional[str] = None,
+ batch: bool = False,
 )
 ```
 
 #### 🔎  Parameter Description
 
-| Parameter                         | Type                   | Required | Description                                                  |
-| --------------------------------- | ---------------------- | -------- | ------------------------------------------------------------ |
-| `messages`                        | `List[Dict[str, str]]` | ✅ Yes    | List of dialogue messages, each with `role` (`user`/`assistant`) and `content` |
-| `metadata`                        | `Dict[str, Any]`       | ✅ Yes    | Must include: <br>・`sample_id`: unique session ID <br>・`user`: list of character names |
-| `user_id` / `agent_id` / `run_id` | Optional[str]          | ❌ No     | Mem0-compatible parameters (ignored in TeleMem)              |
-| `infer`                           | `bool`                 | ❌ No     | Whether to auto-generate memory summaries (default: `True`)  |
-| `memory_type`                     | Optional[str]          | ❌ No     | Memory category (auto-classified if omitted)                 |
-| `prompt`                          | Optional[str]          | ❌ No     | Custom prompt for summarization (uses optimized default if omitted) |
+| Parameter     | Type                            | Required | Description                                                  |
+| ------------- | ------------------------------- | -------- | ------------------------------------------------------------ |
+| `messages`    | `str` or `List[Dict[str, str]]` | ✅ Yes    | A single statement, or a list of dialogue messages with `role` (`user`/`assistant`) and `content` |
+| `user_id`     | `Optional[str]`                 | ❌ No     | Character/user to attribute the memory to; TeleMem keeps an **independent memory profile per `user_id`**. Omit it to store shared conversation-event memories |
+| `agent_id` / `run_id` | `Optional[str]`         | ❌ No     | Additional mem0-compatible scopes (e.g. one `run_id` per session) |
+| `metadata`    | `Optional[Dict[str, Any]]`      | ❌ No     | Arbitrary metadata stored with each memory                  |
+| `infer`       | `bool`                          | ❌ No     | Whether to auto-generate memory summaries (default: `True`)  |
+| `memory_type` | `Optional[str]`                 | ❌ No     | Memory category (auto-classified if omitted)                 |
+| `prompt`      | `Optional[str]`                 | ❌ No     | Custom prompt for summarization (uses optimized default if omitted) |
+| `batch`       | `bool`                          | ❌ No     | Route through the high-throughput batched pipeline (`add_batch`) |
+
+**Returns** the mem0-compatible shape: `{"results": [{"id": "...", "memory": "...", "event": "ADD"}, ...]}`
 
 #### 🔁 Internal Workflow of `add()`
 
@@ -354,7 +390,7 @@ def search(
  user_id: Optional[str] = None,
  agent_id: Optional[str] = None,
  run_id: Optional[str] = None,
- limit: int = 5,
+ limit: int = 100,
  filters: Optional[Dict[str, Any]] = None,
  threshold: Optional[float] = None,
  rerank: bool = True,
@@ -363,15 +399,17 @@ def search(
 
 #### 🔎 Parameter Description
 
-| Parameter              | Type             | Required | Description                                       |
-| ---------------------- | ---------------- | -------- | ------------------------------------------------- |
-| `query`                | `str`            | ✅ Yes    | Natural language query                            |
-| `run_id`               | `str`            | ✅ Yes    | Session ID (must match `sample_id` used in `add`) |
-| `limit`                | `int`            | ❌ No     | Max number of results (default: 5)                |
-| `threshold`            | `float`          | ❌ No     | Similarity threshold (0–1; auto-tuned if omitted) |
-| `filters`              | `Dict[str, Any]` | ❌ No     | Custom filters (e.g., by character, time range)   |
-| `rerank`               | `bool`           | ❌ No     | Whether to rerank results (default: `True`)       |
-| `user_id` / `agent_id` | Optional[str]    | ❌ No     | Mem0-compatible (no effect in TeleMem)            |
+| Parameter   | Type               | Required | Description                                       |
+| ----------- | ------------------ | -------- | ------------------------------------------------- |
+| `query`     | `str`              | ✅ Yes    | Natural language query                            |
+| `user_id`   | `Optional[str]`    | ❌ No     | Character/user profile to search. The shared event memories (pseudo-user `"events"`) are always searched as well |
+| `agent_id` / `run_id` | `Optional[str]` | ❌ No  | Additional mem0-compatible scope filters          |
+| `limit`     | `int`              | ❌ No     | Max number of results (default: 100)              |
+| `threshold` | `Optional[float]`  | ❌ No     | Similarity threshold (0–1; auto-tuned if omitted) |
+| `filters`   | `Dict[str, Any]`   | ❌ No     | Custom filters (e.g., by character, time range)   |
+| `rerank`    | `bool`             | ❌ No     | Whether to rerank results (default: `True`)       |
+
+**Returns** the mem0-compatible shape: `{"results": [{"id": "...", "memory": "...", "score": ..., ...}, ...]}`
 
 > 🔍 Search is based on FAISS vector retrieval, supporting millisecond-level responses.
 
@@ -522,7 +560,7 @@ print(f"Answer: ({answer})")
 TeleMem ships a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server, so any MCP-compatible client — Claude Desktop, Claude Code, Cursor, custom agents — can use TeleMem as its long-term memory.
 
 ```shell
-pip install "telemem[mcp]"
+pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"   # or: pip install -e ".[mcp]" from a checkout
 
 telemem-mcp                                      # stdio (default)
 telemem-mcp --transport sse --port 8421          # SSE over HTTP
@@ -637,8 +675,11 @@ video/
 
 ## Development and Contribution
 
-* Issues and pull requests are welcome.
+* Issues and pull requests are welcome — see the [Contributing Guide](CONTRIBUTING.md) to get started.
+* Changes between releases are tracked in the [Changelog](CHANGELOG.md).
+* CI runs the offline test suite (`uv run pytest tests/ -q`) on Python 3.10–3.12 for every PR.
 * Chinese documentation: [README-ZH.md](README-ZH.md)
+* If you use TeleMem in research, please cite the [Tech Report](https://arxiv.org/abs/2601.06037) (see [CITATION.cff](CITATION.cff)).
 
 ---
 ## License
