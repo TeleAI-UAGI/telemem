@@ -52,6 +52,7 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 ---
 
 ## 📢 Latest Updates
+- **[2026-06-11] 🎉 TeleMem [v1.4.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.4.0) has been released with [MCP support](docs/MCP.md)!**
 - **[2026-01-28] 🎉 TeleMem [v1.3.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.3.0) has been released!**
 - **[2026-01-22] 🎉 TeleMem [Tech Report](https://arxiv.org/abs/2601.06037) has been updated to its 4th version!**
 - **[2026-01-13] 🎉 TeleMem [Tech Report](https://arxiv.org/abs/2601.06037) has been released on arXiv!**
@@ -81,6 +82,7 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 * [Project Structure](#project-structure)
 * [Core Functions](#core-functions)
 * [Multimodal Extensions](#multimodal-extensions)
+* [MCP Server](#mcp-server)
 * [Data Storage Explanation](#data-storage)
 * [Development and Contribution](#development-and-contribution)
 * [Acknowledgements](#acknowledgements)
@@ -268,10 +270,14 @@ telemem/
 ├── data/                   # Small sample datasets for evaluation or demonstration
 ├── examples/               # Code examples and tutorial demos
 │ ├── quickstart.py         # Quick start
-│ └── quickstart_mm.py      # Quick start (multimodal)
+│ ├── quickstart_mm.py      # Quick start (multimodal)
+│ ├── mcp_client.py         # Quick start over MCP (stdio client)
+│ └── mcp_config.json       # MCP config snippet for Claude Desktop / Cursor
 ├── docs/
+│ ├── MCP.md                # MCP server reference
 │ └── TeleMem_Tech_Report.pdf
 ├── telemem/                # Telemem code
+│ └── mcp/                  # Model Context Protocol server
 ├── tests/                  # Telemem test
 ├── README.md               # English README
 ├── README-ZH.md            # Chinese README
@@ -499,6 +505,46 @@ messages = memory.search_mm(
 answer = extract_choice_from_msg(messages)
 print(f"Answer: ({answer})")
 ```
+
+---
+
+## MCP Server
+
+TeleMem ships a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server, so any MCP-compatible client — Claude Desktop, Claude Code, Cursor, custom agents — can use TeleMem as its long-term memory.
+
+```shell
+pip install "telemem[mcp]"
+
+telemem-mcp                                      # stdio (default)
+telemem-mcp --transport sse --port 8421          # SSE over HTTP
+TELEMEM_CONFIG=config/config.yaml telemem-mcp    # custom TeleMem config
+```
+
+The server exposes eight tools: `add_memory`, `search_memories`, `get_memories`, `get_memory`, `update_memory`, `delete_memory`, `delete_all_memories`, and `memory_history`. Calls without an explicit scope default to `TELEMEM_DEFAULT_USER_ID` (`telemem-mcp`); destructive bulk deletion always requires an explicit scope.
+
+Claude Desktop / Cursor configuration ([examples/mcp_config.json](examples/mcp_config.json)):
+
+```json
+{
+  "mcpServers": {
+    "telemem": {
+      "command": "telemem-mcp",
+      "env": {
+        "TELEMEM_CONFIG": "/absolute/path/to/config/config.yaml",
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}
+```
+
+Or drive it programmatically over stdio — the quickstart flow as MCP tool calls:
+
+```shell
+python examples/mcp_client.py
+```
+
+See [docs/MCP.md](docs/MCP.md) for the full tool reference, transports, and client setup.
 
 ---
 

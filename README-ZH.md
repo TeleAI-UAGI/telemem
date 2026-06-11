@@ -55,6 +55,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 
 ## 📢 最新动态
 
+- **[2026-06-11] 🎉 TeleMem [v1.4.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.4.0) 版本发布，新增 [MCP 支持](docs/MCP.md)!**
 - **[2026-01-28] 🎉 TeleMem [v1.3.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.3.0) 版本发布!**
 - **[2026-01-22] 🎉 TeleMem [技术报告](https://arxiv.org/abs/2601.06037) 已经更新至第4版!**
 - **[2026-01-13] 🎉 TeleMem [技术报告](https://arxiv.org/abs/2601.06037) 已经在arXiv上发布!**
@@ -84,6 +85,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 * [项目结构](#项目结构)
 * [核心功能](#核心功能)
 * [多模态扩展](#多模态扩展)
+* [MCP 服务器](#mcp-服务器)
 * [数据存储](#数据存储)
 * [开发与贡献](#开发与贡献)
 * [致谢](#致谢)
@@ -249,10 +251,14 @@ telemem/
 ├── data/                     # 用于评测或演示的小规模示例数据集
 ├── examples/                 # 示例代码与教程 Demo
 │   ├── quickstart.py         # 快速入门示例（文本记忆）
-│   └── quickstart_mm.py      # 快速入门示例（多模态记忆）
+│   ├── quickstart_mm.py      # 快速入门示例（多模态记忆）
+│   ├── mcp_client.py         # 快速入门示例（MCP stdio 客户端）
+│   └── mcp_config.json       # Claude Desktop / Cursor 的 MCP 配置示例
 ├── docs/                     # 项目文档
+│   ├── MCP.md                # MCP 服务器使用文档
 │   └── TeleMem_Tech_Report.pdf
 ├── telemem/                  # TeleMem 源码实现
+│   └── mcp/                  # Model Context Protocol 服务器
 ├── tests/                    # TeleMem 测试
 ├── README.md                 # 项目说明文档（英文版）
 ├── README-ZH.md              # 项目说明文档（中文版）
@@ -482,6 +488,46 @@ messages = memory.search_mm(
 answer = extract_choice_from_msg(messages)
 print(f"Answer: ({answer})")
 ```
+
+---
+
+## MCP 服务器
+
+TeleMem 内置 [Model Context Protocol](https://modelcontextprotocol.io)（MCP）服务器，任何兼容 MCP 的客户端——Claude Desktop、Claude Code、Cursor、自定义 Agent——都可以把 TeleMem 用作长期记忆。
+
+```shell
+pip install "telemem[mcp]"
+
+telemem-mcp                                      # stdio（默认）
+telemem-mcp --transport sse --port 8421          # SSE over HTTP
+TELEMEM_CONFIG=config/config.yaml telemem-mcp    # 自定义 TeleMem 配置
+```
+
+服务器提供八个工具：`add_memory`、`search_memories`、`get_memories`、`get_memory`、`update_memory`、`delete_memory`、`delete_all_memories` 和 `memory_history`。未显式指定作用域的调用默认使用 `TELEMEM_DEFAULT_USER_ID`（`telemem-mcp`）；批量删除等破坏性操作必须显式指定作用域。
+
+Claude Desktop / Cursor 配置示例（[examples/mcp_config.json](examples/mcp_config.json)）：
+
+```json
+{
+  "mcpServers": {
+    "telemem": {
+      "command": "telemem-mcp",
+      "env": {
+        "TELEMEM_CONFIG": "/absolute/path/to/config/config.yaml",
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}
+```
+
+也可以通过 stdio 以编程方式调用——即用 MCP 工具调用复现快速入门流程：
+
+```shell
+python examples/mcp_client.py
+```
+
+完整的工具说明、传输方式与客户端配置见 [docs/MCP.md](docs/MCP.md)。
 
 ---
 

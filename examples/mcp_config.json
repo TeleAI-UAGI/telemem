@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "telemem": {
+      "command": "telemem-mcp",
+      "args": [],
+      "env": {
+        "TELEMEM_CONFIG": "/absolute/path/to/config/config.yaml",
+        "TELEMEM_DEFAULT_USER_ID": "your-handle",
+        "OPENAI_API_KEY": "sk-..."
+      }
+    }
+  }
+}

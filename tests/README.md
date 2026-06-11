@@ -60,6 +60,26 @@ pytest tests/test_telemem.py -v
 总计: 8/8 通过
 ```
 
+### 3. `test_mcp.py` - MCP 服务器测试
+
+**无需 API key** 的 MCP（Model Context Protocol）服务器离线测试，包括：
+- ✅ 工具注册表（名称、描述、必填参数）
+- ✅ 参数到 TeleMem Memory API 的映射
+- ✅ 默认用户作用域与破坏性操作防护
+- ✅ 结构化 JSON 错误返回
+- ✅ stdout 保护（stdio 传输协议完整性）
+- ✅ 基于内存传输的完整客户端/服务器协议往返
+
+**运行方法**：
+```bash
+pip install "telemem[mcp]"
+
+python3 tests/test_mcp.py
+
+# 或使用 pytest
+pytest tests/test_mcp.py -v
+```
+
 ---
 
 ## 快速开始

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "telemem"
-version = "1.1.0"
+dynamic = ["version"]
 description = "High-performance drop-in replacement of Mem0"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,9 +25,20 @@ dependencies = [
     "faiss-cpu"
 ]
 
+[project.optional-dependencies]
+mcp = [
+    "mcp>=1.6.0"
+]
+
+[project.scripts]
+telemem-mcp = "telemem.mcp.server:main"
+
 [project.urls]
 Homepage = "https://github.com/TeleAI-UAGI/telemem"
 Documentation = "https://github.com/TeleAI-UAGI/telemem#readme"
+
+[tool.hatch.version]
+path = "telemem/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["telemem"]

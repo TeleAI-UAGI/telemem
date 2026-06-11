@@ -183,7 +183,7 @@ class TeleMemory(mem0.Memory):
                 )
 
                 result = json.loads(response)
-                print(result)
+                logger.debug("Memory fusion result: %s", result)
                 stored_summaries = [item["summary"] for item in result.get("stored_memories", [])]
             except Exception as e:
                 logger.error(f"LLM fusion failed for cluster: {e}")
@@ -576,7 +576,7 @@ class TeleMemory(mem0.Memory):
             user_ids_to_search = list(user_id) + ["events"]
 
         all_memories = []
-        print(user_ids_to_search)
+        logger.debug("Searching user scopes: %s", user_ids_to_search)
         for uid in user_ids_to_search:
             search_filters = {**base_filters, "user_id": uid}
             memories = self._search_vector_store(
