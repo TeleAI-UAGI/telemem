@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use TeleMem in your research, please cite it as below."
+title: "TeleMem: Building Long-Term and Multimodal Memory for Agentic AI"
+type: software
+authors:
+  - name: "TeleAI Ubiquitous AGI Team"
+  - name: "Bloo-Mind AI Ltd"
+repository-code: "https://github.com/TeleAI-UAGI/telemem"
+license: Apache-2.0
+preferred-citation:
+  type: article
+  title: "TeleMem: Building Long-Term and Multimodal Memory for Agentic AI"
+  authors:
+    - name: "TeleAI Ubiquitous AGI Team"
+  journal: "arXiv preprint arXiv:2601.06037"
+  year: 2026
+  url: "https://arxiv.org/abs/2601.06037"

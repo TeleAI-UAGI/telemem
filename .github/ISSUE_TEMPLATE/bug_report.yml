@@ -1,0 +1,36 @@
+name: Bug report
+description: Something in TeleMem doesn't work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug, plus what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Smallest code snippet + config (redact API keys!) that triggers the bug.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TeleMem version
+      placeholder: 'python -c "import telemem; print(telemem.__version__)"'
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Python 3.10, Ubuntu 22.04, mem0ai x.y.z, provider: OpenAI/Qwen/MiniMax"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traceback
+      render: text

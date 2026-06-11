@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an improvement or new capability for TeleMem
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the use case, not just the feature.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you imagine it working (API sketch welcome).
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
