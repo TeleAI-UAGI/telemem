@@ -4,10 +4,10 @@ from typing import Annotated as A
 from typing import Literal as L
 
 # import config as config
-from build_database import (clip_search_tool, frame_inspect_tool,
-                                global_browse_tool, init_single_video_db)
-from func_call_shema import as_json_schema
-from func_call_shema import doc as D
+from telemem.mm_utils.build_database import (clip_search_tool, frame_inspect_tool,
+                                             global_browse_tool, init_single_video_db)
+from telemem.mm_utils.func_call_shema import as_json_schema
+from telemem.mm_utils.func_call_shema import doc as D
 from telemem.mm_utils.memory_utils import call_openai_model_with_tools, load_config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re

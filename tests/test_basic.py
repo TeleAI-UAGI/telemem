@@ -16,6 +16,21 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _test_config():
+    """每次返回独立的 FAISS 配置，避免多个实例争用 mem0 默认的嵌入式 Qdrant 锁。"""
+    import tempfile
+    from telemem import TeleMemoryConfig
+
+    tmpdir = tempfile.mkdtemp(prefix="telemem-test-")
+    return TeleMemoryConfig(
+        vector_store={
+            "provider": "faiss",
+            "config": {"collection_name": "telemem_test", "path": os.path.join(tmpdir, "faiss_db")},
+        },
+        history_db_path=os.path.join(tmpdir, "history.db"),
+    )
+
+
 def test_import():
     """测试导入功能"""
     print("=" * 60)
@@ -30,7 +45,7 @@ def test_import():
         return True
     except Exception as e:
         print(f"✗ 导入失败: {e}")
-        return False
+        raise AssertionError(f"test failed: {e}")
 
 
 def test_import_classes():
@@ -47,7 +62,7 @@ def test_import_classes():
         return True
     except Exception as e:
         print(f"✗ 导入类失败: {e}")
-        return False
+        raise AssertionError(f"test failed: {e}")
 
 
 def test_config():
@@ -74,7 +89,7 @@ def test_config():
         return True
     except Exception as e:
         print(f"✗ 配置测试失败: {e}")
-        return False
+        raise AssertionError(f"test failed: {e}")
 
 
 def test_memory_creation():
@@ -87,13 +102,13 @@ def test_memory_creation():
         from telemem import TeleMemory, Memory
 
         # TeleMemory
-        mem1 = TeleMemory()
+        mem1 = TeleMemory(config=_test_config())
         print("✓ 创建 TeleMemory 实例成功")
         print(f"  类型: {type(mem1).__name__}")
         print(f"  模块: {type(mem1).__module__}")
 
         # Memory（别名）
-        mem2 = Memory()
+        mem2 = Memory(config=_test_config())
         print("✓ 创建 Memory 实例成功（别名）")
         print(f"  类型: {type(mem2).__name__}")
 
@@ -102,14 +117,14 @@ def test_memory_creation():
             print("✓ Memory 和 TeleMemory 是同一个类")
         else:
             print("✗ Memory 和 TeleMemory 不是同一个类")
-            return False
+            raise AssertionError("Memory and TeleMemory are not the same class")
 
         return True
     except Exception as e:
         print(f"✗ 实例化测试失败: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        raise AssertionError(f"test failed: {e}")
 
 
 def test_mm_utils():
@@ -132,7 +147,7 @@ def test_mm_utils():
         return True
     except Exception as e:
         print(f"✗ mm_utils 导入失败: {e}")
-        return False
+        raise AssertionError(f"test failed: {e}")
 
 
 def test_mem0_compatibility():
@@ -144,7 +159,7 @@ def test_mem0_compatibility():
     try:
         # 作为 mem0 使用
         import telemem as mem0
-        memory = mem0.Memory()
+        memory = mem0.Memory(config=_test_config())
         print("✓ 'import telemem as mem0' 成功")
         print(f"  memory 类型: {type(memory).__name__}")
 
@@ -155,7 +170,7 @@ def test_mem0_compatibility():
         return True
     except Exception as e:
         print(f"✗ 兼容性测试失败: {e}")
-        return False
+        raise AssertionError(f"test failed: {e}")
 
 
 def test_package_structure():
@@ -174,18 +189,19 @@ def test_package_structure():
                 print(f"✓ telemem.{attr} 存在")
             else:
                 print(f"✗ telemem.{attr} 不存在")
-                return False
+                raise AssertionError(f"telemem.{attr} is missing")
 
         # 检查子模块
-        from telemem import config, memory, utils
-        print("✓ config 模块可导入")
-        print("✓ memory 模块可导入")
+        from telemem import configs, utils
+        from telemem import mem0 as telemem_mem0
+        print("✓ configs 模块可导入")
+        print("✓ mem0 模块可导入")
         print("✓ utils 模块可导入")
 
         return True
     except Exception as e:
         print(f"✗ 包结构测试失败: {e}")
-        return False
+        raise AssertionError(f"test failed: {e}")
 
 
 def main():

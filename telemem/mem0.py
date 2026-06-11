@@ -14,36 +14,46 @@ from telemem.utils import (
 from typing import Any, Dict, List, Optional
 import concurrent.futures
 import threading
-import concurrent
-from openai import OpenAI
 from copy import deepcopy
 import json
-import hashlib
 import logging
 import os
-import uuid
 import warnings
-import threading
-from datetime import datetime
-import pytz
 from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-import os
-import sys
+try:
+    from mem0.memory.main import Mem0ValidationError
+except ImportError:  # pragma: no cover - fallback for other mem0 layouts
+    from mem0.exceptions import ValidationError as Mem0ValidationError
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, 'mm_utils'))
-from core import MMCoreAgent
-from frame_caption import process_video
-from build_database import init_single_video_db
-from video_utils import decode_video_to_frames
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*SwigPy.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*swigvarlink.*")
 
 logger = logging.getLogger(__name__)
-logging.getLogger().setLevel(logging.WARNING)
+
+
+def _import_mm():
+    """Lazily import the multimodal (video) stack.
+
+    The video pipeline needs heavy optional dependencies (opencv, yt-dlp,
+    nano-vectordb, ...) that are only installed with `telemem[video]`, so they
+    must not be imported when users only need text memory.
+    """
+    try:
+        from telemem.mm_utils.core import MMCoreAgent
+        from telemem.mm_utils.frame_caption import process_video
+        from telemem.mm_utils.build_database import init_single_video_db
+        from telemem.mm_utils.video_utils import decode_video_to_frames
+    except ImportError as exc:
+        raise ImportError(
+            "TeleMem's multimodal (video) features require extra dependencies. "
+            'Install them with: pip install "telemem[video]"'
+        ) from exc
+    return MMCoreAgent, process_video, init_single_video_db, decode_video_to_frames
 
 class TeleMemory(mem0.Memory):
     def __init__(self, config: TeleMemoryConfig = TeleMemoryConfig()):
@@ -297,6 +307,7 @@ class TeleMemory(mem0.Memory):
 
         mem_buffer = self._extract_summary_from_messages(user_id, messages, metadata, filters, infer)
         returned_memories = self._sync_memory_to_vector_store(mem_buffer, metadata, filters, infer)
+        return {"results": returned_memories}
 
     def add_batch(
         self,
@@ -337,6 +348,7 @@ class TeleMemory(mem0.Memory):
         # print(buffer_key)
         # buffer_lock = self._get_buffer_lock(buffer_key)
         tasks = [(idx, uid, msgs) for idx, msgs in enumerate(messages) for uid in user_id_list]
+        returned_memories: List[Dict[str, Any]] = []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
             future_to_task = {
@@ -372,7 +384,7 @@ class TeleMemory(mem0.Memory):
                             self.memory_buffer[buffer_key] = []
                         self.memory_buffer[buffer_key].extend(mem_buffer)
                         if len(self.memory_buffer[buffer_key]) >= self.buffer_size:
-                            self._flush_buffer(buffer_key)
+                            returned_memories.extend(self._flush_buffer(buffer_key) or [])
 
                 except Exception as e:
                     logger.error(f"Error processing message {idx} for user_id={uid}: {e}")
@@ -384,11 +396,9 @@ class TeleMemory(mem0.Memory):
             buffer_lock = self._get_buffer_lock(buffer_key)
             with buffer_lock:
                 if buffer_key in self.memory_buffer and self.memory_buffer[buffer_key]:
-                    self._flush_buffer(buffer_key)
+                    returned_memories.extend(self._flush_buffer(buffer_key) or [])
 
-        # print(self.vector_store.list())
-
-        
+        return {"results": returned_memories}
 
     def _extract_summary_from_messages(self, user_id, messages, metadata, filters, infer):
         # print(messages)
@@ -481,18 +491,19 @@ class TeleMemory(mem0.Memory):
 
             try:
                 result = json.loads(response)
-                returnd_memories = [item["summary"] for item in result.get("stored_memories", [])]
+                stored_summaries = [item["summary"] for item in result.get("stored_memories", [])]
 
             except Exception as e:
                 logger.error(f"Invalid JSON response: {e}")
-                returnd_memories = []
+                stored_summaries = []
 
-            for mem in returnd_memories:
+            for mem in stored_summaries:
                 memory_id = self._create_memory(
                     data = mem,
                     existing_embeddings={},
                     metadata=deepcopy(metadata)
                 )
+                returned_memories.append({"id": memory_id, "memory": mem, "event": "ADD"})
 
         return returned_memories
 
@@ -541,21 +552,6 @@ class TeleMemory(mem0.Memory):
                   Example for v1.1+: `{"results": [{"id": "...", "memory": "...", "score": 0.8, ...}]}`
         """
 
-        # original_memories = self._search_vector_store(
-        #     query, filters, limit, threshold
-        # )
-
-        # if rerank and self.reranker and original_memories:
-        #     try:
-        #         reranked_memories = self.reranker.rerank(query, original_memories, limit)
-        #         original_memories = reranked_memories
-        #     except Exception as e:
-        #         logger.warning(f"Reranking failed, using original results: {e}")
-
-        # output_memories = [memory['memory'] for memory in original_memories]
-
-        # return " ".join(output_memories)
-
         if filters is None:
             filters = {}
 
@@ -598,9 +594,9 @@ class TeleMemory(mem0.Memory):
             except Exception as e:
                 logger.warning(f"Global reranking failed, using raw results: {e}")
 
-        # Extract non-empty memory texts
-        output_memories = [mem.get("memory", "") for mem in all_memories if mem.get("memory", "").strip()]
-        return " ".join(output_memories)
+        # Drop empty memories, keep the mem0-compatible result shape
+        results = [mem for mem in all_memories if mem.get("memory", "").strip()]
+        return {"results": results}
 
 
     def add_mm(
@@ -633,6 +629,8 @@ class TeleMemory(mem0.Memory):
                      if None, reads from config.LOCAL_EMBEDDING_LARGE_DIM
             subtitle_path: Optional, path to subtitle file passed to process_video; None means no subtitles
         """
+        _, process_video, init_single_video_db, decode_video_to_frames = _import_mm()
+
         # 1. Parse video name (without extension)
         video_abs = os.path.abspath(video_path)
         video_name = os.path.splitext(os.path.basename(video_abs))[0]
@@ -727,6 +725,7 @@ class TeleMemory(mem0.Memory):
         Returns:
             messages: List of messages returned by MMCoreAgent.run(question)
         """
+        MMCoreAgent, _, _, _ = _import_mm()
 
         output_dir_abs = os.path.abspath(os.path.join(BASE_DIR, output_dir))
 

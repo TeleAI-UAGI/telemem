@@ -107,6 +107,19 @@ def _resolve_scope(
     return user_id, agent_id, run_id
 
 
+def _fuse_search_results(raw: Any) -> str:
+    """Collapse a search result into one text passage for the MCP client.
+
+    TeleMem's ``Memory.search`` returns the mem0-compatible
+    ``{"results": [{"memory": ...}, ...]}`` shape; older versions returned a
+    pre-joined string. Accept both.
+    """
+    if isinstance(raw, dict):
+        texts = [item.get("memory", "") for item in raw.get("results", [])]
+        return " ".join(text for text in texts if text and text.strip())
+    return raw if isinstance(raw, str) else _dumps(raw)
+
+
 def _scope_dict(
     user_id: Optional[str], agent_id: Optional[str], run_id: Optional[str]
 ) -> Dict[str, str]:
@@ -206,13 +219,15 @@ def create_server(host: str = "127.0.0.1", port: int = 8421) -> FastMCP:
         return _call(
             lambda memory: {
                 "query": query,
-                "memories": memory.search(
-                    query,
-                    user_id=scope[0],
-                    agent_id=scope[1],
-                    run_id=scope[2],
-                    limit=limit,
-                    threshold=threshold,
+                "memories": _fuse_search_results(
+                    memory.search(
+                        query,
+                        user_id=scope[0],
+                        agent_id=scope[1],
+                        run_id=scope[2],
+                        limit=limit,
+                        threshold=threshold,
+                    )
                 ),
             }
         )

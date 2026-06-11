@@ -13,21 +13,33 @@ authors = [
     {name = "TeleAI-UAGI"}
 ]
 dependencies = [
+    "mem0ai",
     "openai",
     "pydantic",
-    "chromadb",
-    "opencv-python-headless",
-    "nano-vectordb",
-    "mem0ai",
+    "faiss-cpu",
+    "numpy",
+    "pyyaml",
     "tqdm",
-    "azure-identity",
-    "yt_dlp",
-    "faiss-cpu"
 ]
 
 [project.optional-dependencies]
 mcp = [
     "mcp>=1.6.0"
+]
+video = [
+    "opencv-python-headless",
+    "nano-vectordb",
+    "yt_dlp",
+    "azure-identity",
+    "requests",
+]
+all = [
+    "telemem[mcp,video]",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
 ]
 
 [project.scripts]

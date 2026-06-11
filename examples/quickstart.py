@@ -35,7 +35,8 @@ def main():
         "What transportation did Jordan use to go to work today?",
         user_id="Jordan",
     )
-    print(results)
+    for hit in results["results"]:  # same result shape as mem0
+        print(hit["memory"])
 
 
 if __name__ == "__main__":

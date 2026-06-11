@@ -9,7 +9,7 @@ from nano_vectordb import NanoVectorDB
 from tqdm import tqdm
 
 # import config as config
-from func_call_shema import doc as D
+from telemem.mm_utils.func_call_shema import doc as D
 from telemem.mm_utils.memory_utils import AzureOpenAIEmbeddingService, call_openai_model_with_tools
 
 from telemem.mm_utils.memory_utils import load_config
