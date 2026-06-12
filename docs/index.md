@@ -43,11 +43,11 @@ flowchart LR
 ## Install
 
 ```shell
-pip install "telemem @ git+https://github.com/TeleAI-UAGI/telemem.git"
+pip install telemem
 
 # extras
-pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"    # MCP server
-pip install "telemem[video] @ git+https://github.com/TeleAI-UAGI/telemem.git"  # video pipeline
+pip install "telemem[mcp]"    # MCP server
+pip install "telemem[video]"  # video pipeline
 ```
 
 Continue with the [Quickstart](quickstart.md).

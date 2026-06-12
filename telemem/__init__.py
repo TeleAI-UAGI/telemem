@@ -7,7 +7,7 @@ from .configs import TeleMemoryConfig
 from .mem0 import TeleMemory
 from .mem0 import TeleMemory as Memory
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 
 # Everything mem0 exposes, with TeleMem's classes layered on top.
 __all__ = sorted(

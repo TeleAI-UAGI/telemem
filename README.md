@@ -13,6 +13,9 @@
   <a href="https://github.com/TeleAI-UAGI/telemem/actions/workflows/ci.yml">
     <img src="https://github.com/TeleAI-UAGI/telemem/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
+  <a href="https://pypi.org/project/telemem/">
+    <img src="https://img.shields.io/pypi/v/telemem?color=blue" alt="PyPI">
+  </a>
   <a href="https://github.com/TeleAI-UAGI/telemem">
     <img src="https://img.shields.io/github/stars/TeleAI-UAGI/TeleMem?style=social" alt="GitHub Stars">
   </a>
@@ -62,6 +65,7 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 ---
 
 ## 📢 Latest Updates
+- **[2026-06-12] 🎉 TeleMem is now on PyPI: `pip install telemem`! [v1.6.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.6.0) adds Ollama/DeepSeek/Kimi configs, LangChain & LlamaIndex examples, and a [documentation site](https://teleai-uagi.github.io/telemem/).**
 - **[2026-06-12] 🎉 TeleMem [v1.5.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.5.0) has been released: true mem0 drop-in API, lightweight core install, and CI!**
 - **[2026-06-11] 🎉 TeleMem [v1.4.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.4.0) has been released with [MCP support](docs/MCP.md)!**
 - **[2026-01-28] 🎉 TeleMem [v1.3.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.3.0) has been released!**
@@ -198,7 +202,16 @@ Memory capability was assessed via QA benchmarks, e.g.:
 
 ## Quick Start
 
-### Environment Preparation
+### Installation
+
+```shell
+pip install telemem            # core (text memory)
+pip install "telemem[mcp]"     # + MCP server
+pip install "telemem[video]"   # + video/multimodal pipeline
+pip install "telemem[all]"     # everything
+```
+
+### Development Environment
 
 Using [uv](https://docs.astral.sh/uv/) (recommended — creates `.venv` from the committed `uv.lock` for a reproducible environment):
 
@@ -213,16 +226,8 @@ Or with conda + pip:
 # Create and activate virtual environment
 conda create -n telemem python=3.10
 conda activate telemem
-# Install dependencies
-pip install -e .
-```
-
-Optional extras — the core install is lightweight (text memory only); pull in what you need:
-
-```shell
-pip install -e ".[mcp]"     # Model Context Protocol server (telemem-mcp)
-pip install -e ".[video]"   # video/multimodal pipeline (opencv, yt-dlp, ...)
-pip install -e ".[all]"     # everything
+# Install from source (editable), with the extras you need
+pip install -e ".[all]"
 ```
 
 ### Example
@@ -577,7 +582,7 @@ print(f"Answer: ({answer})")
 TeleMem ships a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server, so any MCP-compatible client — Claude Desktop, Claude Code, Cursor, custom agents — can use TeleMem as its long-term memory.
 
 ```shell
-pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"   # or: pip install -e ".[mcp]" from a checkout
+pip install "telemem[mcp]"
 
 telemem-mcp                                      # stdio (default)
 telemem-mcp --transport sse --port 8421          # SSE over HTTP
@@ -620,7 +625,7 @@ TeleMem drops into any agent framework with the same two calls — `search()` be
 | --------- | ------- | ------- |
 | **LangChain** | [examples/langchain_memory.py](examples/langchain_memory.py) | `pip install langchain-core langchain-openai` |
 | **LlamaIndex** | [examples/llamaindex_memory.py](examples/llamaindex_memory.py) | `pip install llama-index-llms-openai` |
-| **Claude Desktop / Cursor / any MCP client** | [MCP Server](#mcp-server) | `pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"` |
+| **Claude Desktop / Cursor / any MCP client** | [MCP Server](#mcp-server) | `pip install "telemem[mcp]"` |
 
 Because TeleMem is mem0 API-compatible, any framework adapter written for Mem0's OSS client also works — point it at `telemem.Memory` instead.
 

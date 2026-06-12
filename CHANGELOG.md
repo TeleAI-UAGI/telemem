@@ -3,7 +3,20 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.6.0] - 2026-06-12
+
+First release published to PyPI: `pip install telemem`.
+
+### Added
+- Provider config examples with offline tests: **Ollama** (fully local stack),
+  **DeepSeek**, and **Moonshot (Kimi)** — `config/config.<provider>.yaml` +
+  `tests/test_providers.py`.
+- Framework integration examples: `examples/langchain_memory.py` and
+  `examples/llamaindex_memory.py`.
+- Documentation site at https://teleai-uagi.github.io/telemem/ (mkdocs-material,
+  auto-deployed via GitHub Pages).
+- LongMemEval evaluation harness: `baselines/longmemeval/run_telemem.py`
+  (experimental; results pending).
 
 ### Changed
 - Moved the research/evaluation variant of `TeleMemory` out of the shipped

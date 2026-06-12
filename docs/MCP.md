@@ -8,9 +8,7 @@ local TeleMem instance.
 ## Installation
 
 ```shell
-pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"
-# or, from a source checkout:
-pip install -e ".[mcp]"
+pip install "telemem[mcp]"
 ```
 
 This installs the [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) on

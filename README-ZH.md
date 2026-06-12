@@ -13,6 +13,9 @@
   <a href="https://github.com/TeleAI-UAGI/telemem/actions/workflows/ci.yml">
     <img src="https://github.com/TeleAI-UAGI/telemem/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
+  <a href="https://pypi.org/project/telemem/">
+    <img src="https://img.shields.io/pypi/v/telemem?color=blue" alt="PyPI">
+  </a>
   <a href="https://github.com/TeleAI-UAGI/telemem">
     <img src="https://img.shields.io/github/stars/TeleAI-UAGI/TeleMem?style=social" alt="GitHub Stars">
   </a>
@@ -65,6 +68,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 
 ## 📢 最新动态
 
+- **[2026-06-12] 🎉 TeleMem 已上线 PyPI：`pip install telemem`！[v1.6.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.6.0) 新增 Ollama/DeepSeek/Kimi 配置、LangChain 与 LlamaIndex 示例，以及[文档站点](https://teleai-uagi.github.io/telemem/)。**
 - **[2026-06-12] 🎉 TeleMem [v1.5.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.5.0) 版本发布：完整 mem0 兼容 API、轻量级核心安装与 CI!**
 - **[2026-06-11] 🎉 TeleMem [v1.4.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.4.0) 版本发布，新增 [MCP 支持](docs/MCP.md)!**
 - **[2026-01-28] 🎉 TeleMem [v1.3.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.3.0) 版本发布!**
@@ -202,7 +206,16 @@ TeleMem 相比于 Mem0 针对 **角色化、长期化、高性能** 核心需求
 
 ## 快速使用
 
-### 环境准备
+### 安装
+
+```shell
+pip install telemem            # 核心（文本记忆）
+pip install "telemem[mcp]"     # + MCP 服务器
+pip install "telemem[video]"   # + 视频/多模态流水线
+pip install "telemem[all]"     # 全部安装
+```
+
+### 开发环境
 
 使用 [uv](https://docs.astral.sh/uv/)（推荐——基于已提交的 `uv.lock` 创建 `.venv`，环境可复现）：
 
@@ -218,16 +231,8 @@ uv run python examples/quickstart.py
 conda create -n telemem python=3.10
 conda activate telemem
 
-# 安装依赖
-pip install -e .
-```
-
-可选 extras——核心安装是轻量级的（仅文本记忆），按需安装：
-
-```shell
-pip install -e ".[mcp]"     # Model Context Protocol 服务器（telemem-mcp）
-pip install -e ".[video]"   # 视频/多模态流水线（opencv、yt-dlp 等）
-pip install -e ".[all]"     # 全部安装
+# 从源码安装（可编辑模式），按需选择 extras
+pip install -e ".[all]"
 ```
 
 ### 示例
@@ -560,7 +565,7 @@ print(f"Answer: ({answer})")
 TeleMem 内置 [Model Context Protocol](https://modelcontextprotocol.io)（MCP）服务器，任何兼容 MCP 的客户端——Claude Desktop、Claude Code、Cursor、自定义 Agent——都可以把 TeleMem 用作长期记忆。
 
 ```shell
-pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"   # 或在源码目录中：pip install -e ".[mcp]"
+pip install "telemem[mcp]"
 
 telemem-mcp                                      # stdio（默认）
 telemem-mcp --transport sse --port 8421          # SSE over HTTP
@@ -603,7 +608,7 @@ TeleMem 只需两个调用即可接入任何 Agent 框架——回答前 `search
 | ---- | ---- | ---- |
 | **LangChain** | [examples/langchain_memory.py](examples/langchain_memory.py) | `pip install langchain-core langchain-openai` |
 | **LlamaIndex** | [examples/llamaindex_memory.py](examples/llamaindex_memory.py) | `pip install llama-index-llms-openai` |
-| **Claude Desktop / Cursor / 任何 MCP 客户端** | [MCP 服务器](#mcp-服务器) | `pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"` |
+| **Claude Desktop / Cursor / 任何 MCP 客户端** | [MCP 服务器](#mcp-服务器) | `pip install "telemem[mcp]"` |
 
 由于 TeleMem 与 mem0 API 兼容，任何为 Mem0 开源客户端编写的框架适配器同样适用——把实例换成 `telemem.Memory` 即可。
 

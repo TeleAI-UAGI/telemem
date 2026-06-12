@@ -1,6 +1,13 @@
 # Quickstart
 
-## Setup
+## Install
+
+```shell
+pip install telemem            # core (text memory)
+pip install "telemem[all]"     # + MCP server + video pipeline
+```
+
+## Development setup
 
 With [uv](https://docs.astral.sh/uv/) (recommended, reproducible via the committed `uv.lock`):
 
@@ -8,13 +15,6 @@ With [uv](https://docs.astral.sh/uv/) (recommended, reproducible via the committ
 git clone https://github.com/TeleAI-UAGI/telemem.git
 cd telemem
 uv sync --all-extras
-```
-
-Or with pip:
-
-```shell
-pip install -e .            # core (text memory)
-pip install -e ".[all]"     # + MCP server + video pipeline
 ```
 
 ## First memory
