@@ -1,0 +1,33 @@
+# TeleMem configuration using DeepSeek as the LLM provider
+#
+# DeepSeek provides an OpenAI-compatible API at https://api.deepseek.com/v1
+# Get your API key at: https://platform.deepseek.com
+#
+# Note: DeepSeek does not offer a public embedding API.
+# Configure a separate embedding service (e.g. OpenAI) for the embedder section.
+
+llm:
+  provider: openai
+  config:
+    model: deepseek-chat  # or deepseek-reasoner for the reasoning model
+    openai_base_url: https://api.deepseek.com/v1
+    api_key: your-deepseek-api-key  # or export DEEPSEEK_API_KEY
+    temperature: 0.7
+
+embedder:
+  provider: openai
+  config:
+    model: text-embedding-3-small
+    openai_base_url: https://api.openai.com/v1
+    api_key: your-openai-api-key  # Required for embeddings (DeepSeek has no embedding API)
+
+vector_store:
+  provider: faiss
+  config:
+    collection_name: telemem
+    path: db/faiss_db
+
+history_db_path: db/history.db
+
+buffer_size: 64
+similarity_threshold: 0.95

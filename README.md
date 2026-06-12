@@ -289,6 +289,21 @@ Key points for MiniMax usage:
 - **Temperature**: must be in **(0.0, 1.0]** — set explicitly (e.g. `0.7`) to avoid out-of-range errors
 - **Embeddings**: MiniMax does not provide a public embedding API; configure a separate embedder (e.g. `text-embedding-3-small`) in the `embedder` section
 
+### More LLM Providers
+
+TeleMem works with **any OpenAI-compatible endpoint**. Ready-to-use config examples ship in `config/`:
+
+| Provider | Config file | LLM | Embeddings | Notes |
+| -------- | ----------- | --- | ---------- | ----- |
+| **Ollama** (fully local) | [`config.ollama.yaml`](config/config.ollama.yaml) | any local model (e.g. `qwen3:8b`) | `nomic-embed-text`, local | **No API key, no cloud** — everything runs on your machine |
+| **DeepSeek** | [`config.deepseek.yaml`](config/config.deepseek.yaml) | `deepseek-chat` / `deepseek-reasoner` | external (e.g. OpenAI) | `export DEEPSEEK_API_KEY=...` |
+| **Moonshot (Kimi)** | [`config.moonshot.yaml`](config/config.moonshot.yaml) | `kimi-k2-0905-preview` | external (e.g. OpenAI) | `.cn` and `.ai` endpoints supported |
+| **MiniMax** | [`config.minimax.yaml`](config/config.minimax.yaml) | `MiniMax-M3` | external (e.g. OpenAI) | see section above |
+
+```shell
+TELEMEM_CONFIG=config/config.ollama.yaml python examples/quickstart.py   # 100% local memory
+```
+
 ---
 
 ## Project Structure

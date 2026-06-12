@@ -1,0 +1,35 @@
+# TeleMem configuration using Moonshot AI (Kimi) as the LLM provider
+#
+# Moonshot provides an OpenAI-compatible API:
+#   - China:         https://api.moonshot.cn/v1
+#   - International: https://api.moonshot.ai/v1
+# Get your API key at: https://platform.moonshot.cn (or platform.moonshot.ai)
+#
+# Note: Moonshot does not offer a public embedding API.
+# Configure a separate embedding service (e.g. OpenAI) for the embedder section.
+
+llm:
+  provider: openai
+  config:
+    model: kimi-k2-0905-preview  # alternatives: kimi-latest, moonshot-v1-8k
+    openai_base_url: https://api.moonshot.cn/v1
+    api_key: your-moonshot-api-key  # or export MOONSHOT_API_KEY
+    temperature: 0.6
+
+embedder:
+  provider: openai
+  config:
+    model: text-embedding-3-small
+    openai_base_url: https://api.openai.com/v1
+    api_key: your-openai-api-key  # Required for embeddings (Moonshot has no embedding API)
+
+vector_store:
+  provider: faiss
+  config:
+    collection_name: telemem
+    path: db/faiss_db
+
+history_db_path: db/history.db
+
+buffer_size: 64
+similarity_threshold: 0.95

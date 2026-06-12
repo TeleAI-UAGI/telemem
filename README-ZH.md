@@ -270,6 +270,21 @@ memory = mem0.Memory(config=config)
 TELEMEM_CONFIG=config/config.yaml python examples/quickstart.py
 ```
 
+### 更多 LLM Provider
+
+TeleMem 支持**任何 OpenAI 兼容接口**。`config/` 目录内置了开箱即用的配置示例：
+
+| Provider | 配置文件 | LLM | 向量化 | 说明 |
+| -------- | -------- | --- | ------ | ---- |
+| **Ollama**（完全本地） | [`config.ollama.yaml`](config/config.ollama.yaml) | 任意本地模型（如 `qwen3:8b`） | `nomic-embed-text`，本地 | **无需 API key、无需云服务**——全部在本机运行 |
+| **DeepSeek** | [`config.deepseek.yaml`](config/config.deepseek.yaml) | `deepseek-chat` / `deepseek-reasoner` | 外部（如 OpenAI） | `export DEEPSEEK_API_KEY=...` |
+| **Moonshot（Kimi）** | [`config.moonshot.yaml`](config/config.moonshot.yaml) | `kimi-k2-0905-preview` | 外部（如 OpenAI） | 支持 `.cn` 与 `.ai` 两个端点 |
+| **MiniMax** | [`config.minimax.yaml`](config/config.minimax.yaml) | `MiniMax-M3` | 外部（如 OpenAI） | temperature 须在 (0.0, 1.0] |
+
+```shell
+TELEMEM_CONFIG=config/config.ollama.yaml python examples/quickstart.py   # 100% 本地记忆
+```
+
 ---
 
 ## 项目结构
