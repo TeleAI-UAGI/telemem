@@ -3,9 +3,14 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.7.0] - 2026-06-12
 
 ### Added
+- Published to the official [MCP registry](https://registry.modelcontextprotocol.io)
+  as `io.github.teleai-uagi/telemem`: `server.json` manifest, PyPI ownership
+  marker, and an OIDC-authenticated publish job in the release workflow.
+- New `telemem` console script (alias of `telemem-mcp`) so `uvx telemem`
+  runs the MCP server with zero install, per the registry convention.
 - Evaluation charter (`docs/evaluation.md`) aligned with
   [*The Benchmark Theatre*](https://essays.bloo-mind.ai/posts/2026-05-20-mem-eval/):
   baselines before architecture, constant base model, deterministic scoring,
@@ -16,6 +21,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   95% intervals, and `--validate-judge` adversarial judge auditing.
   The charter applies to new runs; existing published results are unchanged
   pending team review.
+
+### Changed
+- The MCP SDK (`mcp>=1.6.0`) is now a core dependency — TeleMem is
+  MCP-ready out of the box; `telemem[mcp]` remains as a no-op alias.
 
 ## [1.6.0] - 2026-06-12
 

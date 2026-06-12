@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.teleai-uagi/telemem",
+  "description": "Long-term and multimodal memory for AI agents - character-aware, mem0-compatible, fully-local option",
+  "repository": {
+    "url": "https://github.com/TeleAI-UAGI/telemem",
+    "source": "github"
+  },
+  "version": "1.7.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "telemem",
+      "version": "1.7.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "OPENAI_API_KEY",
+          "description": "API key for the default OpenAI LLM/embedder (not needed with a local TELEMEM_CONFIG)",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "TELEMEM_CONFIG",
+          "description": "Path to a TeleMem YAML/JSON config, e.g. the fully-local Ollama + FAISS setup (config/config.ollama.yaml)",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TELEMEM_DEFAULT_USER_ID",
+          "description": "Default memory scope when tool calls omit user_id/agent_id/run_id (default: telemem-mcp)",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

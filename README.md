@@ -582,11 +582,12 @@ print(f"Answer: ({answer})")
 TeleMem ships a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server, so any MCP-compatible client — Claude Desktop, Claude Code, Cursor, custom agents — can use TeleMem as its long-term memory.
 
 ```shell
-pip install "telemem[mcp]"
+pip install telemem
 
 telemem-mcp                                      # stdio (default)
 telemem-mcp --transport sse --port 8421          # SSE over HTTP
 TELEMEM_CONFIG=config/config.yaml telemem-mcp    # custom TeleMem config
+uvx telemem                                      # zero-install run (stdio)
 ```
 
 The server exposes eight tools: `add_memory`, `search_memories`, `get_memories`, `get_memory`, `update_memory`, `delete_memory`, `delete_all_memories`, and `memory_history`. Calls without an explicit scope default to `TELEMEM_DEFAULT_USER_ID` (`telemem-mcp`); destructive bulk deletion always requires an explicit scope.
@@ -754,4 +755,6 @@ Made with ❤️ by [Bloo-Mind AI Ltd](https://www.bloo-mind.ai/) and the Ubiqui
     <a href="https://www.bloo-mind.ai/"><img src="assets/bloo-mind.png" alt="Bloo-Mind Logo" width="120px" /></a>
     &nbsp;&nbsp;&nbsp;
     <img src="assets/TeleAI.png" alt="TeleAI Logo" width="120px" />
-</div> 
+</div>
+
+<sub>mcp-name: io.github.teleai-uagi/telemem</sub>

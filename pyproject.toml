@@ -20,9 +20,12 @@ dependencies = [
     "numpy",
     "pyyaml",
     "tqdm",
+    "mcp>=1.6.0",
 ]
 
 [project.optional-dependencies]
+# Kept as an alias for backward compatibility: the MCP SDK is now a core
+# dependency so `uvx telemem` works without extras (MCP registry convention).
 mcp = [
     "mcp>=1.6.0"
 ]
@@ -44,6 +47,9 @@ dev = [
 
 [project.scripts]
 telemem-mcp = "telemem.mcp.server:main"
+# `telemem` == the MCP server on stdio, so `uvx telemem` works out of the box
+# (the MCP registry convention is that the package identifier is runnable).
+telemem = "telemem.mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/TeleAI-UAGI/telemem"

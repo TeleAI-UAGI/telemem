@@ -1816,6 +1816,7 @@ name = "telemem"
 source = { editable = "." }
 dependencies = [
     { name = "faiss-cpu" },
+    { name = "mcp" },
     { name = "mem0ai" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -1855,6 +1856,7 @@ requires-dist = [
     { name = "azure-identity", marker = "extra == 'all'" },
     { name = "azure-identity", marker = "extra == 'video'" },
     { name = "faiss-cpu" },
+    { name = "mcp", specifier = ">=1.6.0" },
     { name = "mcp", marker = "extra == 'all'", specifier = ">=1.6.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.6.0" },
     { name = "mem0ai" },

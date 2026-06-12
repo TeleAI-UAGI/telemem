@@ -56,3 +56,40 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  mcp-registry:
+    # Publish to the official MCP registry (registry.modelcontextprotocol.io).
+    # Auth: GitHub OIDC grants the io.github.teleai-uagi/* namespace; package
+    # ownership is proven by the "mcp-name:" marker in the PyPI description.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mcp-publisher
+        run: |
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m).tar.gz" | tar xz mcp-publisher
+
+      - name: Sync server.json version to tag
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$TAG_VERSION" '.version = $v | .packages[0].version = $v' server.json > server.json.tmp
+          mv server.json.tmp server.json
+
+      - name: Wait for PyPI to serve the new version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          for i in $(seq 1 30); do
+            curl -sf "https://pypi.org/pypi/telemem/$TAG_VERSION/json" >/dev/null && exit 0
+            sleep 10
+          done
+          echo "PyPI version $TAG_VERSION not visible after 5 minutes" >&2
+          exit 1
+
+      - name: Publish to MCP registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

@@ -565,11 +565,12 @@ print(f"Answer: ({answer})")
 TeleMem 内置 [Model Context Protocol](https://modelcontextprotocol.io)（MCP）服务器，任何兼容 MCP 的客户端——Claude Desktop、Claude Code、Cursor、自定义 Agent——都可以把 TeleMem 用作长期记忆。
 
 ```shell
-pip install "telemem[mcp]"
+pip install telemem
 
 telemem-mcp                                      # stdio（默认）
 telemem-mcp --transport sse --port 8421          # SSE over HTTP
 TELEMEM_CONFIG=config/config.yaml telemem-mcp    # 自定义 TeleMem 配置
+uvx telemem                                      # 零安装运行（stdio）
 ```
 
 服务器提供八个工具：`add_memory`、`search_memories`、`get_memories`、`get_memory`、`update_memory`、`delete_memory`、`delete_all_memories` 和 `memory_history`。未显式指定作用域的调用默认使用 `TELEMEM_DEFAULT_USER_ID`（`telemem-mcp`）；批量删除等破坏性操作必须显式指定作用域。
