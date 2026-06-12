@@ -97,6 +97,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 * [核心功能](#核心功能)
 * [多模态扩展](#多模态扩展)
 * [MCP 服务器](#mcp-服务器)
+* [框架集成](#框架集成)
 * [数据存储](#数据存储)
 * [开发与贡献](#开发与贡献)
 * [致谢](#致谢)
@@ -591,6 +592,20 @@ python examples/mcp_client.py
 ```
 
 完整的工具说明、传输方式与客户端配置见 [docs/MCP.md](docs/MCP.md)。
+
+---
+
+## 框架集成
+
+TeleMem 只需两个调用即可接入任何 Agent 框架——回答前 `search()`，每轮对话后 `add()`：
+
+| 框架 | 示例 | 安装 |
+| ---- | ---- | ---- |
+| **LangChain** | [examples/langchain_memory.py](examples/langchain_memory.py) | `pip install langchain-core langchain-openai` |
+| **LlamaIndex** | [examples/llamaindex_memory.py](examples/llamaindex_memory.py) | `pip install llama-index-llms-openai` |
+| **Claude Desktop / Cursor / 任何 MCP 客户端** | [MCP 服务器](#mcp-服务器) | `pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"` |
+
+由于 TeleMem 与 mem0 API 兼容，任何为 Mem0 开源客户端编写的框架适配器同样适用——把实例换成 `telemem.Memory` 即可。
 
 ---
 

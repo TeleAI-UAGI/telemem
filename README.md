@@ -94,6 +94,7 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 * [Core Functions](#core-functions)
 * [Multimodal Extensions](#multimodal-extensions)
 * [MCP Server](#mcp-server)
+* [Framework Integrations](#framework-integrations)
 * [Data Storage Explanation](#data-storage)
 * [Development and Contribution](#development-and-contribution)
 * [Acknowledgements](#acknowledgements)
@@ -608,6 +609,20 @@ python examples/mcp_client.py
 ```
 
 See [docs/MCP.md](docs/MCP.md) for the full tool reference, transports, and client setup.
+
+---
+
+## Framework Integrations
+
+TeleMem drops into any agent framework with the same two calls — `search()` before answering, `add()` after each exchange:
+
+| Framework | Example | Install |
+| --------- | ------- | ------- |
+| **LangChain** | [examples/langchain_memory.py](examples/langchain_memory.py) | `pip install langchain-core langchain-openai` |
+| **LlamaIndex** | [examples/llamaindex_memory.py](examples/llamaindex_memory.py) | `pip install llama-index-llms-openai` |
+| **Claude Desktop / Cursor / any MCP client** | [MCP Server](#mcp-server) | `pip install "telemem[mcp] @ git+https://github.com/TeleAI-UAGI/telemem.git"` |
+
+Because TeleMem is mem0 API-compatible, any framework adapter written for Mem0's OSS client also works — point it at `telemem.Memory` instead.
 
 ---
 
