@@ -185,22 +185,33 @@ TeleMem 相比于 Mem0 针对 **角色化、长期化、高性能** 核心需求
 
 ### 实验配置
 
-* 大语言模型：统一使用[ Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B)，关闭thinking模式
+* 大语言模型：统一使用[ Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B)，关闭thinking模式——**每一行使用完全相同的模型**
 * 嵌入模型：统一使用 [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)
-* 评价指标：记忆问答准确率
+* 评价指标：多项选择问答准确率（**确定性精确匹配——不使用 LLM 评判**）
 
-    | Method                                                    | Overall(%) |
-    |:--------------------------------------------------------- |:---------- |
-    | RAG                                                       | 62.45      |
-    | _[Mem0](https://github.com/mem0ai/mem0)_                  | _70.20_    |
-    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      |
-    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
-    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      |
-    | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  |
+    | Method                                                    | Overall(%) | 说明 |
+    |:--------------------------------------------------------- |:---------- |:---- |
+    | RAG                                                       | 62.45      | 检索基线 |
+    | _[Mem0](https://github.com/mem0ai/mem0)_                  | _70.20_    | |
+    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      | |
+    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      | |
+    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      | |
+    | 全上下文（整段对话直接放入 prompt）                          | 84.92      | **最关键的基线**——慢且 token 开销巨大 |
+    | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  | 以远低于全上下文的单题成本达到同级准确率 |
 
-<!--
-    | Long-Context LLM (Slow and Expensive)                     | 84.92      |
--->
+#### 如何解读这张表
+
+我们以 [*The Benchmark Theatre*](https://essays.bloo-mind.ai/posts/2026-05-20-mem-eval/)
+一文提出的评测标准要求自己——完整说明见[评测原则](https://teleai-uagi.github.io/telemem/evaluation/)。要点：
+
+- **诚实的结论不是"TeleMem 比 Mem0 高 16 个点"**，而是：TeleMem 与全上下文基线打平（+1.4 个点，
+  在噪声范围内），但每题只读取一小段检索结果而非整段 600 轮对话，并提供原始上下文无法实现的
+  按角色记忆隔离。输给全上下文基线的记忆系统，测的其实是上下文管理而非记忆。
+- **自评、单次运行。** TeleMem 与各基线均由我们自己配置运行——这是几乎所有已发表记忆评测共有的
+  结构性利益冲突。多种子运行与置信区间见 [#10](https://github.com/TeleAI-UAGI/telemem/issues/10)。
+  完整复现工具在 [`baselines/`](baselines/) 中——我们真诚欢迎独立复现，包括与我们结论相悖的结果。
+- ZH-4O 对话仍可放入前沿模型的上下文窗口，因此该测试部分上仍是上下文管理测试；更长跨度与
+  on-policy 评测见[路线图](https://teleai-uagi.github.io/telemem/evaluation/#roadmap)。
 
 ---
 

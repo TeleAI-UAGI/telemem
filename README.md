@@ -181,22 +181,39 @@ Memory capability was assessed via QA benchmarks, e.g.:
 
 ### Experimental Configuration
 
-- LLM: [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) (thinking mode disabled)
+- LLM: [Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) (thinking mode disabled) — **identical for every row**
 - Embedding model: [Qwen3-Embedding-8B](https://huggingface.co/Qwen/Qwen3-Embedding-8B)
-- Metric: QA accuracy
+- Metric: multiple-choice QA accuracy (**deterministic exact match — no LLM judge**)
 
-    | Method                                                    | Overall(%) |
-    |:--------------------------------------------------------- |:---------- |
-    | RAG                                                       | 62.45      |
-    | _[Mem0](https://github.com/mem0ai/mem0)_                    | _70.20_      |
-    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      |
-    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      |
-    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      |
-    | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  |
+    | Method                                                    | Overall(%) | Notes |
+    |:--------------------------------------------------------- |:---------- |:----- |
+    | RAG                                                       | 62.45      | retrieval baseline |
+    | _[Mem0](https://github.com/mem0ai/mem0)_                  | _70.20_    | |
+    | [MOOM](https://github.com/cows21/MOOM-Roleplay-Dialogue)  | 72.60      | |
+    | [A-mem](https://github.com/agiresearch/A-mem)             | 73.78      | |
+    | [Memobase](https://github.com/memodb-io/memobase)         | 76.78      | |
+    | Full-context (entire conversation in the prompt)          | 84.92      | **the baseline that matters** — slow and token-expensive |
+    | **[TeleMem](https://github.com/TeleAI-UAGI/TeleMem)**     | **86.33**  | full-context-level accuracy at a fraction of the per-question cost |
 
-<!--
-    | Long-Context LLM (Slow and Expensive)                     | 84.92      |
--->
+#### How to read this table
+
+We hold ourselves to the evaluation standards argued in
+[*The Benchmark Theatre*](https://essays.bloo-mind.ai/posts/2026-05-20-mem-eval/) — see our full
+[Evaluation Principles](https://teleai-uagi.github.io/telemem/evaluation/). The short version:
+
+- **The honest claim is not "TeleMem beats Mem0 by 16 points."** It is: TeleMem matches the
+  full-context baseline (+1.4 pts — within noise) while reading a small retrieved slice instead
+  of the whole 600-turn conversation per question, and adds per-character isolation that raw
+  context cannot provide. Memory systems that *lose* to full-context are measuring context
+  management, not memory.
+- **Self-reported, single-run.** We built TeleMem and we configured the baselines — a structural
+  conflict of interest shared by nearly every published memory benchmark. Multi-seed runs with
+  confidence intervals are tracked in [#10](https://github.com/TeleAI-UAGI/telemem/issues/10).
+  The full reproduction harness is in [`baselines/`](baselines/) — we'd genuinely welcome
+  independent reproductions, including ones that disagree with us.
+- ZH-4O conversations still fit in frontier context windows, so this is partly a
+  context-management test; longer-horizon and on-policy evaluation are on our
+  [roadmap](https://teleai-uagi.github.io/telemem/evaluation/#roadmap).
 
 ---
 

@@ -44,5 +44,6 @@ nav:
   - LLM Providers: providers.md
   - Video Memory: video.md
   - MCP Server: MCP.md
+  - Evaluation Principles: evaluation.md
   - API Reference: api.md
   - Contributing: contributing.md
