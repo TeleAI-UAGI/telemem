@@ -12,6 +12,14 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to (re)publish, e.g. v1.7.0 — must match telemem.__version__ on this ref"
+        required: true
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
 
 jobs:
   build:
@@ -25,9 +33,9 @@ jobs:
       - name: Verify tag matches package version
         run: |
           PKG_VERSION=$(uv run --no-project python -c "import re,pathlib;print(re.search(r'__version__ = \"(.+?)\"', pathlib.Path('telemem/__init__.py').read_text()).group(1))")
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${RELEASE_TAG#v}"
           if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match telemem.__version__ ($PKG_VERSION)" >&2
+            echo "Release version $RELEASE_TAG does not match telemem.__version__ ($PKG_VERSION)" >&2
             exit 1
           fi
 
@@ -56,6 +64,8 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
 
   mcp-registry:
     # Publish to the official MCP registry (registry.modelcontextprotocol.io).
@@ -71,17 +81,19 @@ jobs:
 
       - name: Install mcp-publisher
         run: |
-          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m).tar.gz" | tar xz mcp-publisher
+          ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH=amd64 ;; aarch64) ARCH=arm64 ;; esac
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          curl -sL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}_${ARCH}.tar.gz" | tar xz mcp-publisher
 
       - name: Sync server.json version to tag
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${RELEASE_TAG#v}"
           jq --arg v "$TAG_VERSION" '.version = $v | .packages[0].version = $v' server.json > server.json.tmp
           mv server.json.tmp server.json
 
       - name: Wait for PyPI to serve the new version
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${RELEASE_TAG#v}"
           for i in $(seq 1 30); do
             curl -sf "https://pypi.org/pypi/telemem/$TAG_VERSION/json" >/dev/null && exit 0
             sleep 10
