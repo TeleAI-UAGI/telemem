@@ -45,3 +45,15 @@ jobs:
 
       - name: Check metadata
         run: uvx twine check dist/*
+
+  docker:
+    name: docker image builds and starts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t telemem-mcp .
+
+      - name: Server entrypoint responds
+        run: docker run --rm telemem-mcp --help
