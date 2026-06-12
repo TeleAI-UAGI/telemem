@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/teleai-uagi-telemem-badge.png)](https://mseep.ai/app/teleai-uagi-telemem)
+
 <p align="center">
   <a href="https://github.com/TeleAI-UAGI/telemem">
     <img src="./assets/TeleMem.png" width="40%" />
