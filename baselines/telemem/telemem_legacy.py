@@ -1,3 +1,13 @@
+"""Research/evaluation variant of TeleMemory (formerly telemem/main.py).
+
+This module backs the ZH-4O benchmark harness (EvalModel.py): it keeps the
+eval-only machinery (`online_query`, `offline_build_graph_json`, buffer
+flushing) that is not part of the shipped `telemem` package, whose
+mem0-compatible implementation lives in telemem/mem0.py.
+
+Extra requirements beyond the core package: tenacity, pytz.
+"""
+
 from mem0 import Memory
 from telemem.utils import (
     load_config,

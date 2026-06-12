@@ -1,5 +1,5 @@
 from pathlib import Path
-from telemem.main import TeleMemory
+from telemem_legacy import TeleMemory
 from telemem.configs import TeleMemoryConfig
 from telemem.utils import load_config
 import json

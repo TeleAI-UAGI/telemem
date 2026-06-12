@@ -1,4 +1,4 @@
-from eval.EvalModel import MemoryEval
+from EvalModel import MemoryEval
 
 data_path = "data/ZH-4O_locomo_format.json"
 memory_manager = MemoryEval(data_path=data_path)

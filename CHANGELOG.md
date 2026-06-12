@@ -3,6 +3,15 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- Moved the research/evaluation variant of `TeleMemory` out of the shipped
+  package: `telemem/main.py` → `baselines/telemem/telemem_legacy.py`. It backs
+  the ZH-4O benchmark harness (`online_query`, `offline_build_graph_json`) and
+  needs `tenacity`/`pytz`, which are not core dependencies. Also fixed the
+  broken `eval.py` import in the TeleMem baseline.
+
 ## [1.5.0] - 2026-06-12
 
 ### Added
