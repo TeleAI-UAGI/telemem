@@ -3,6 +3,24 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Evaluation charter (`docs/evaluation.md`) aligned with
+  [*The Benchmark Theatre*](https://essays.bloo-mind.ai/posts/2026-05-20-mem-eval/):
+  baselines before architecture, constant base model, deterministic scoring,
+  audited judges, multi-seed reporting with Wilson intervals,
+  cost/latency as first-class metrics, conflict-of-interest disclosure.
+- LongMemEval harness v2 implementing the charter: `--system
+  {telemem, full-context, grep}`, `--seeds N` (mean ± std), per-type Wilson
+  95% intervals, and `--validate-judge` adversarial judge auditing.
+
+### Changed
+- README ZH-4O results table now shows the full-context baseline (84.92%,
+  previously commented out) and discloses single-run/self-reported status;
+  the headline claim is reframed as full-context-level accuracy at a
+  fraction of the per-question cost, plus character isolation.
+
 ## [1.6.0] - 2026-06-12
 
 First release published to PyPI: `pip install telemem`.
