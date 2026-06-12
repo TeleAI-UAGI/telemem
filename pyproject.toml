@@ -5,12 +5,28 @@ build-backend = "hatchling.build"
 [project]
 name = "telemem"
 dynamic = ["version"]
-description = "High-performance drop-in replacement of Mem0"
+description = "Long-term & multimodal memory for AI agents — character isolation, video pipeline, MCP server, mem0-compatible"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "TeleAI-UAGI"}
+]
+keywords = [
+    "memory", "agent-memory", "long-term-memory", "mem0", "mcp",
+    "model-context-protocol", "langchain", "llm", "rag", "faiss",
+    "multimodal", "video-memory", "character-memory", "local-llm",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
     "mem0ai",
@@ -53,7 +69,9 @@ telemem = "telemem.mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/TeleAI-UAGI/telemem"
-Documentation = "https://github.com/TeleAI-UAGI/telemem#readme"
+Documentation = "https://teleai-uagi.github.io/telemem/"
+Changelog = "https://github.com/TeleAI-UAGI/telemem/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/TeleAI-UAGI/telemem/issues"
 
 [tool.hatch.version]
 path = "telemem/__init__.py"
