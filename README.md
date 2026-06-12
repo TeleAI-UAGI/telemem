@@ -757,4 +757,4 @@ Made with ❤️ by [Bloo-Mind AI Ltd](https://www.bloo-mind.ai/) and the Ubiqui
     <img src="assets/TeleAI.png" alt="TeleAI Logo" width="120px" />
 </div>
 
-<sub>mcp-name: io.github.teleai-uagi/telemem</sub>
+<sub>mcp-name: io.github.TeleAI-UAGI/telemem</sub>

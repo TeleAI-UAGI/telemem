@@ -3,6 +3,13 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.7.1] - 2026-06-12
+
+### Fixed
+- MCP registry name uses the canonical GitHub org casing
+  (`io.github.TeleAI-UAGI/telemem`) so OIDC namespace authorization and
+  the PyPI ownership marker match.
+
 ## [1.7.0] - 2026-06-12
 
 ### Added

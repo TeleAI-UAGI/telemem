@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
-  "name": "io.github.teleai-uagi/telemem",
+  "name": "io.github.TeleAI-UAGI/telemem",
   "description": "Long-term and multimodal memory for AI agents - character-aware, mem0-compatible, fully-local option",
   "repository": {
     "url": "https://github.com/TeleAI-UAGI/telemem",
