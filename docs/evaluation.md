@@ -45,28 +45,16 @@ Every TeleMem-published result must satisfy, or explicitly disclose deviation fr
    as claims awaiting independent reproduction — and use our harnesses to
    check them. Reproductions (confirming or not) are welcome as issues/PRs.
 
-## How to read our ZH-4O results
+## Scope and status
 
-The README's ZH-4O table is reported under these disclosures:
-
-- **Deterministic MCQ scoring** — no LLM judge is involved, so judge bias
-  (the largest known distortion on LoCoMo-style benchmarks) does not apply.
-- **Same stack for every row** — all systems ran with Qwen3-8B +
-  Qwen3-Embedding-8B, configured by us. This holds the base model constant
-  (principle 2) but is also a conflict-of-interest surface (principle 9):
-  we know TeleMem's optimal configuration better than its competitors'.
-- **Single-run, self-reported** — multi-seed re-runs are tracked in
-  [issue #10](https://github.com/TeleAI-UAGI/telemem/issues/10).
-- **The full-context baseline is shown, not hidden.** Feeding the entire
-  conversation to the LLM scores 84.92% — within ~1.4 points of TeleMem's
-  86.33%. By principle 6 that accuracy gap alone does not justify a memory
-  system. TeleMem's case on ZH-4O is the *joint* claim: full-context-level
-  accuracy at a fraction of the per-question token cost and latency, with
-  per-character memory isolation that raw context cannot provide.
-- **ZH-4O conversations fit in frontier context windows**, so like LoCoMo
-  and LongMemEval-S, this is partly a context-management test. Memory only
-  becomes *necessary* beyond the window — which is why our roadmap
-  prioritizes longer-horizon and on-policy evaluation.
+This charter governs **new evaluation runs** — everything produced with the
+harnesses in [`baselines/`](https://github.com/TeleAI-UAGI/telemem/tree/main/baselines)
+going forward. Existing published results (such as the README's ZH-4O table,
+which uses deterministic multiple-choice scoring with the same Qwen3-8B stack
+for every system) predate the charter; bringing them fully under it — re-runs,
+added baselines, and expanded disclosures — is being coordinated with the
+broader TeleAI team and tracked in
+[issue #10](https://github.com/TeleAI-UAGI/telemem/issues/10).
 
 ## Roadmap
 

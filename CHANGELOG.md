@@ -14,12 +14,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - LongMemEval harness v2 implementing the charter: `--system
   {telemem, full-context, grep}`, `--seeds N` (mean ± std), per-type Wilson
   95% intervals, and `--validate-judge` adversarial judge auditing.
-
-### Changed
-- README ZH-4O results table now shows the full-context baseline (84.92%,
-  previously commented out) and discloses single-run/self-reported status;
-  the headline claim is reframed as full-context-level accuracy at a
-  fraction of the per-question cost, plus character isolation.
+  The charter applies to new runs; existing published results are unchanged
+  pending team review.
 
 ## [1.6.0] - 2026-06-12
 
