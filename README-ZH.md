@@ -65,6 +65,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 
 ## 📢 最新动态
 
+- **[2026-06-12] 🎉 TeleMem [v1.5.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.5.0) 版本发布：完整 mem0 兼容 API、轻量级核心安装与 CI!**
 - **[2026-06-11] 🎉 TeleMem [v1.4.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.4.0) 版本发布，新增 [MCP 支持](docs/MCP.md)!**
 - **[2026-01-28] 🎉 TeleMem [v1.3.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.3.0) 版本发布!**
 - **[2026-01-22] 🎉 TeleMem [技术报告](https://arxiv.org/abs/2601.06037) 已经更新至第4版!**

@@ -62,6 +62,7 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 ---
 
 ## 📢 Latest Updates
+- **[2026-06-12] 🎉 TeleMem [v1.5.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.5.0) has been released: true mem0 drop-in API, lightweight core install, and CI!**
 - **[2026-06-11] 🎉 TeleMem [v1.4.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.4.0) has been released with [MCP support](docs/MCP.md)!**
 - **[2026-01-28] 🎉 TeleMem [v1.3.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.3.0) has been released!**
 - **[2026-01-22] 🎉 TeleMem [Tech Report](https://arxiv.org/abs/2601.06037) has been updated to its 4th version!**

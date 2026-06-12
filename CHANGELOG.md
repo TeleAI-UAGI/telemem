@@ -3,7 +3,7 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.5.0] - Unreleased
+## [1.5.0] - 2026-06-12
 
 ### Added
 - mem0-compatible return values: `Memory.add()` / `add_batch()` now return
