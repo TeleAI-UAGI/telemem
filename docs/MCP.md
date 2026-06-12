@@ -74,7 +74,7 @@ self-correct instead of failing opaquely.
 ### Claude Desktop / Cursor
 
 Add to `claude_desktop_config.json` (or Cursor's `mcp.json`) — see
-[examples/mcp_config.json](../examples/mcp_config.json):
+[examples/mcp_config.json](https://github.com/TeleAI-UAGI/telemem/blob/main/examples/mcp_config.json):
 
 ```json
 {
@@ -100,7 +100,7 @@ claude mcp add telemem -e TELEMEM_CONFIG=/absolute/path/to/config/config.yaml --
 
 ### Python client
 
-[examples/mcp_client.py](../examples/mcp_client.py) drives the server programmatically over
+[examples/mcp_client.py](https://github.com/TeleAI-UAGI/telemem/blob/main/examples/mcp_client.py) drives the server programmatically over
 stdio — the quickstart flow (add a conversation, search it) expressed as MCP tool calls:
 
 ```shell

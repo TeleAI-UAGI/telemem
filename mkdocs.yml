@@ -1,0 +1,48 @@
+site_name: TeleMem
+site_description: Long-term and multimodal memory for agentic AI — a high-performance, mem0-compatible memory layer.
+site_url: https://teleai-uagi.github.io/telemem/
+repo_url: https://github.com/TeleAI-UAGI/telemem
+repo_name: TeleAI-UAGI/telemem
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/TeleMem.png
+  favicon: assets/TeleMem.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - LLM Providers: providers.md
+  - Video Memory: video.md
+  - MCP Server: MCP.md
+  - API Reference: api.md
+  - Contributing: contributing.md
