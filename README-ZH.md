@@ -68,6 +68,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 
 ## 📢 最新动态
 
+- **[2026-06-12] 🎉 TeleMem [v1.7.1](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.7.1) 已登陆[官方 MCP 注册表](https://registry.modelcontextprotocol.io)——零安装运行记忆服务器：`uvx telemem`！同时新增[评测原则](https://teleai-uagi.github.io/telemem/evaluation/)与内置基线的 LongMemEval 评测工具。**
 - **[2026-06-12] 🎉 TeleMem 已上线 PyPI：`pip install telemem`！[v1.6.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.6.0) 新增 Ollama/DeepSeek/Kimi 配置、LangChain 与 LlamaIndex 示例，以及[文档站点](https://teleai-uagi.github.io/telemem/)。**
 - **[2026-06-12] 🎉 TeleMem [v1.5.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.5.0) 版本发布：完整 mem0 兼容 API、轻量级核心安装与 CI!**
 - **[2026-06-11] 🎉 TeleMem [v1.4.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.4.0) 版本发布，新增 [MCP 支持](docs/MCP.md)!**
