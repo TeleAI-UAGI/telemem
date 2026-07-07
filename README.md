@@ -741,13 +741,7 @@ TeleMem’s development has been deeply inspired by open-source communities and 
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=TeleAI-UAGI%2Ftelemem&type=date&legend=bottom-right">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=TeleAI-UAGI/telemem&type=date&theme=dark&legend=bottom-right&sealed_token=AYg0UQyYVfFNZGgbu0BI-U0ddDTI8q-qlFf_-hytKAktxurEsPH7OmkqnxjTex1vdD98_LlpN9rALId7n1abLpe8lio9UfbNB8UL2-xayS66nGCIs_k9o5rwmgxOpcvDpCyF7b6_Z5FITc5ONSngiJCIf6s4YI6t4Dq39n0grIlQ6R5Jw0K0DjFWA5y2" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=TeleAI-UAGI/telemem&type=date&legend=bottom-right&sealed_token=AYg0UQyYVfFNZGgbu0BI-U0ddDTI8q-qlFf_-hytKAktxurEsPH7OmkqnxjTex1vdD98_LlpN9rALId7n1abLpe8lio9UfbNB8UL2-xayS66nGCIs_k9o5rwmgxOpcvDpCyF7b6_Z5FITc5ONSngiJCIf6s4YI6t4Dq39n0grIlQ6R5Jw0K0DjFWA5y2" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=TeleAI-UAGI/telemem&type=date&legend=bottom-right&sealed_token=AYg0UQyYVfFNZGgbu0BI-U0ddDTI8q-qlFf_-hytKAktxurEsPH7OmkqnxjTex1vdD98_LlpN9rALId7n1abLpe8lio9UfbNB8UL2-xayS66nGCIs_k9o5rwmgxOpcvDpCyF7b6_Z5FITc5ONSngiJCIf6s4YI6t4Dq39n0grIlQ6R5Jw0K0DjFWA5y2" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/chart?repos=TeleAI-UAGI/telemem&type=date&legend=bottom-right&sealed_token=AYg0UQyYVfFNZGgbu0BI-U0ddDTI8q-qlFf_-hytKAktxurEsPH7OmkqnxjTex1vdD98_LlpN9rALId7n1abLpe8lio9UfbNB8UL2-xayS66nGCIs_k9o5rwmgxOpcvDpCyF7b6_Z5FITc5ONSngiJCIf6s4YI6t4Dq39n0grIlQ6R5Jw0K0DjFWA5y2)](https://www.star-history.com/?repos=TeleAI-UAGI%2Ftelemem&type=date&legend=bottom-right)
 
 ---
 
