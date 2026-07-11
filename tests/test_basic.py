@@ -42,7 +42,7 @@ def test_import():
         print("✓ 导入 telemem 成功")
         print(f"  版本: {telemem.__version__}")
         print(f"  导出: {telemem.__all__}")
-        return True
+
     except Exception as e:
         print(f"✗ 导入失败: {e}")
         raise AssertionError(f"test failed: {e}")
@@ -59,7 +59,7 @@ def test_import_classes():
         print("✓ 导入 TeleMemory 成功")
         print("✓ 导入 TeleMemoryConfig 成功")
         print("✓ 导入 Memory 成功（别名）")
-        return True
+
     except Exception as e:
         print(f"✗ 导入类失败: {e}")
         raise AssertionError(f"test failed: {e}")
@@ -86,7 +86,7 @@ def test_config():
         print(f"  自定义 buffer_size: {custom.buffer_size}")
         print(f"  自定义 similarity_threshold: {custom.similarity_threshold}")
 
-        return True
+
     except Exception as e:
         print(f"✗ 配置测试失败: {e}")
         raise AssertionError(f"test failed: {e}")
@@ -119,7 +119,7 @@ def test_memory_creation():
             print("✗ Memory 和 TeleMemory 不是同一个类")
             raise AssertionError("Memory and TeleMemory are not the same class")
 
-        return True
+
     except Exception as e:
         print(f"✗ 实例化测试失败: {e}")
         import traceback
@@ -144,7 +144,7 @@ def test_mm_utils():
         print("✓ 导入 init_single_video_db 成功")
         print("✓ 导入 process_video 成功")
         print("✓ 导入 load_config 成功")
-        return True
+
     except Exception as e:
         print(f"✗ mm_utils 导入失败: {e}")
         raise AssertionError(f"test failed: {e}")
@@ -167,7 +167,7 @@ def test_mem0_compatibility():
         config = mem0.TeleMemoryConfig()
         print("✓ 访问 TeleMemoryConfig 成功")
 
-        return True
+
     except Exception as e:
         print(f"✗ 兼容性测试失败: {e}")
         raise AssertionError(f"test failed: {e}")
@@ -198,7 +198,7 @@ def test_package_structure():
         print("✓ mem0 模块可导入")
         print("✓ utils 模块可导入")
 
-        return True
+
     except Exception as e:
         print(f"✗ 包结构测试失败: {e}")
         raise AssertionError(f"test failed: {e}")
@@ -224,8 +224,8 @@ def main():
     results = []
     for test_func in tests:
         try:
-            result = test_func()
-            results.append(result)
+            test_func()
+            results.append(True)
         except Exception as e:
             print(f"\n✗ 测试异常: {e}")
             import traceback

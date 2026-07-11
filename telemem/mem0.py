@@ -28,6 +28,8 @@ try:
 except ImportError:  # pragma: no cover - fallback for other mem0 layouts
     from mem0.exceptions import ValidationError as Mem0ValidationError
 
+from mem0.configs.enums import MemoryType
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*SwigPy.*")
@@ -242,11 +244,12 @@ class TeleMemory(mem0.Memory):
             infer (bool, optional): If True (default), an LLM is used to extract key facts from
                 'messages' and decide whether to add, update, or delete related memories.
                 If False, 'messages' are added as raw memories directly.
-            memory_type (str, optional): Specifies the type of memory. Currently, only
-                `MemoryType.PROCEDURAL.value` ("procedural_memory") is explicitly handled for
-                creating procedural memories (typically requires 'agent_id'). Otherwise, memories
-                are treated as general conversational/factual memories.memory_type (str, optional): Type of memory to create. Defaults to None. By default, it creates the short term memories and long term (semantic and episodic) memories. Pass "procedural_memory" to create procedural memories.
-            prompt (str, optional): Prompt to use for the memory creation. Defaults to None.
+            memory_type (str, optional): Type of memory to create. Defaults to None
+                (general conversational/factual memories). Pass "procedural_memory" to
+                delegate to mem0's procedural-memory pipeline (typically requires 'agent_id').
+            prompt (str, optional): Custom extraction prompt. When provided it replaces
+                TeleMem's built-in summarization prompts as the system prompt, and the raw
+                transcript is supplied as the user message. Ignored when infer=False.
 
 
         Returns:
@@ -290,12 +293,34 @@ class TeleMemory(mem0.Memory):
                 suggestion="Convert your input to a string, dictionary, or list of dictionaries."
             )
 
+        if user_id is None and agent_id is None and run_id is None:
+            raise Mem0ValidationError(
+                message="At least one of 'user_id', 'agent_id', or 'run_id' is required.",
+                error_code="VALIDATION_001",
+                details={"user_id": None, "agent_id": None, "run_id": None},
+                suggestion="Pass user_id (a character/user profile), agent_id, or run_id to scope the memory.",
+            )
+
+        if memory_type is not None and memory_type != MemoryType.PROCEDURAL.value:
+            raise Mem0ValidationError(
+                message=f"Invalid 'memory_type'. Only '{MemoryType.PROCEDURAL.value}' is supported.",
+                error_code="VALIDATION_002",
+                details={"provided_value": memory_type, "valid_values": [MemoryType.PROCEDURAL.value]},
+                suggestion=f"Omit memory_type for conversational memories, or pass '{MemoryType.PROCEDURAL.value}'.",
+            )
+
         filters = {}
         if metadata is None:
             metadata = {}
         if user_id:
             metadata["user_id"] = user_id
             filters["user_id"] = user_id
+        else:
+            # No character/user profile given: store in the shared "events"
+            # scope, matching add_batch(), so that search() — which always
+            # includes the "events" scope — can retrieve these memories.
+            metadata["user_id"] = "events"
+            filters["user_id"] = "events"
 
         if agent_id:
             metadata["agent_id"] = agent_id
@@ -305,9 +330,34 @@ class TeleMemory(mem0.Memory):
             metadata["run_id"] = run_id
             filters["run_id"] = run_id
 
-        mem_buffer = self._extract_summary_from_messages(user_id, messages, metadata, filters, infer)
+        if memory_type == MemoryType.PROCEDURAL.value:
+            # Delegate to mem0's procedural-memory pipeline unchanged.
+            return self._create_procedural_memory(messages, metadata=metadata, prompt=prompt)
+
+        if not infer:
+            return {"results": self._add_raw_memories(messages, metadata)}
+
+        mem_buffer = self._extract_summary_from_messages(user_id, messages, metadata, filters, infer, prompt=prompt)
         returned_memories = self._sync_memory_to_vector_store(mem_buffer, metadata, filters, infer)
         return {"results": returned_memories}
+
+    def _add_raw_memories(self, messages: List[Dict[str, Any]], metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Store message contents verbatim — the `infer=False` path.
+
+        No LLM is involved: each non-system message's content becomes one
+        memory, with the message role recorded in metadata.
+        """
+        returned_memories = []
+        for msg in messages:
+            content = (msg.get("content") or "").strip()
+            if not content or msg.get("role") == "system":
+                continue
+            meta = deepcopy(metadata)
+            if msg.get("role"):
+                meta["role"] = msg["role"]
+            memory_id = self._create_memory(data=content, existing_embeddings={}, metadata=meta)
+            returned_memories.append({"id": memory_id, "memory": content, "event": "ADD"})
+        return returned_memories
 
     def add_batch(
         self,
@@ -324,6 +374,14 @@ class TeleMemory(mem0.Memory):
         """
         Batch create a new memory.
         """
+
+        if memory_type is not None:
+            raise Mem0ValidationError(
+                message="'memory_type' is not supported by the batch pipeline.",
+                error_code="VALIDATION_002",
+                details={"provided_value": memory_type},
+                suggestion="Use add(messages, memory_type='procedural_memory', ...) for procedural memories.",
+            )
 
         if metadata is None:
             metadata = {}
@@ -344,10 +402,27 @@ class TeleMemory(mem0.Memory):
             metadata["run_id"] = run_id
             shared_filters["run_id"] = run_id
 
-        # buffer_key = self._get_buffer_key(run_id, None)
-        # print(buffer_key)
-        # buffer_lock = self._get_buffer_lock(buffer_key)
-        tasks = [(idx, uid, msgs) for idx, msgs in enumerate(messages) for uid in user_id_list]
+        normalized_messages = []
+        for msgs in messages:
+            if isinstance(msgs, str):
+                msgs = [{"role": "user", "content": msgs}]
+            elif isinstance(msgs, dict):
+                msgs = [msgs]
+            normalized_messages.append(msgs)
+
+        if not infer:
+            # Raw storage: no LLM extraction, no buffering/fusion. Each scope
+            # (every requested user profile plus "events") gets the verbatim
+            # message contents.
+            raw_memories: List[Dict[str, Any]] = []
+            for msgs in normalized_messages:
+                for uid in user_id_list:
+                    raw_memories.extend(
+                        self._add_raw_memories(msgs, self._build_memory_metadata(metadata, uid))
+                    )
+            return {"results": raw_memories}
+
+        tasks = [(idx, uid, msgs) for idx, msgs in enumerate(normalized_messages) for uid in user_id_list]
         returned_memories: List[Dict[str, Any]] = []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
@@ -358,7 +433,8 @@ class TeleMemory(mem0.Memory):
                     messages=msgs,
                     metadata=self._build_memory_metadata(metadata, uid),
                     filters={**shared_filters, "user_id": ("events" if uid is None else uid)},
-                    infer=infer
+                    infer=infer,
+                    prompt=prompt,
                 ): (idx, uid)
                 for (idx, uid, msgs) in tasks
             }
@@ -400,16 +476,21 @@ class TeleMemory(mem0.Memory):
 
         return {"results": returned_memories}
 
-    def _extract_summary_from_messages(self, user_id, messages, metadata, filters, infer):
-        # print(messages)
-        # print(user_id)
+    def _extract_summary_from_messages(self, user_id, messages, metadata, filters, infer, prompt=None):
         parsed_messages = parse_messages(messages[-1:])
         context_messages = parse_messages(messages[0:-1])
-        if user_id is None:
+        if prompt is not None:
+            # mem0-compatible `prompt` override: the caller's prompt becomes the
+            # system prompt and receives the raw transcript, current turn last.
+            # Its output goes through the same extract_events_from_text parser
+            # (summary format / JSON list / bullet-list fallbacks).
+            system_prompt = prompt
+            user_prompt = f"{context_messages}\n{parsed_messages}".strip()
+        elif user_id is None:
             system_prompt, user_prompt = get_recent_messages_prompt(parsed_messages, context_messages)
         else:
-            system_prompt, user_prompt = get_person_prompt(parse_messages, context_messages, user_id)
-        
+            system_prompt, user_prompt = get_person_prompt(parsed_messages, context_messages, user_id)
+
         response = self.llm.generate_response(
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -596,6 +677,14 @@ class TeleMemory(mem0.Memory):
 
         # Drop empty memories, keep the mem0-compatible result shape
         results = [mem for mem in all_memories if mem.get("memory", "").strip()]
+
+        # Honor `limit` across the merged scopes (user profile + "events"):
+        # without this cap, searching N scopes could return up to N*limit
+        # results when no reranker is configured.
+        if len(results) > limit:
+            results.sort(key=lambda m: m.get("score") or 0.0, reverse=True)
+            results = results[:limit]
+
         return {"results": results}
 
 

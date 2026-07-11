@@ -86,8 +86,6 @@ def test_import():
     except AttributeError:
         print_info("未找到 __all__（可选）")
 
-    return True
-
 
 def test_config():
     """测试 2: 配置管理"""
@@ -111,7 +109,7 @@ def test_config():
         print(f"  - 自定义 buffer_size: {custom_config.buffer_size}")
         print(f"  - 自定义 similarity_threshold: {custom_config.similarity_threshold}")
 
-        return True
+
     except Exception as e:
         print_error(f"配置测试失败: {e}")
         import traceback
@@ -145,7 +143,7 @@ def test_memory_initialization():
         print_success("自定义配置实例创建成功")
         print(f"  - buffer_size: {memory3.buffer_size}")
 
-        return True
+
     except Exception as e:
         print_error(f"实例化测试失败: {e}")
         import traceback
@@ -210,7 +208,6 @@ def test_add_return_format():
         else:
             print_error("对话消息添加失败")
 
-        return True
 
     except Exception as e:
         print_error(f"add 方法测试失败: {e}")
@@ -249,7 +246,6 @@ def test_search_functionality():
         print(f"  - 结果类型: {type(results)}")
         print(f"  - 结果: {results}")
 
-        return True
 
     except Exception as e:
         print_error(f"search 方法测试失败: {e}")
@@ -276,7 +272,6 @@ def test_drop_in_compatibility():
         config = mem0.TeleMemoryConfig()
         print_success("API 兼容性良好")
 
-        return True
 
     except Exception as e:
         print_error(f"兼容性测试失败: {e}")
@@ -300,7 +295,6 @@ def test_mm_utils_import():
         print(f"  - process_video: {process_video}")
         print(f"  - load_config: {load_config}")
 
-        return True
 
     except ImportError as e:
         print_error(f"导入 mm_utils 失败: {e}")
@@ -314,7 +308,7 @@ def test_edge_cases():
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         print_info("跳过边界测试（需要 API key）")
-        return True
+
 
     try:
         memory = TeleMemory()
@@ -335,7 +329,6 @@ def test_edge_cases():
         except Exception as e:
             print_info(f"None user_id 处理（预期行为）: {e}")
 
-        return True
 
     except Exception as e:
         print_error(f"边界测试失败: {e}")

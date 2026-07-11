@@ -3,6 +3,46 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- **Character memory extraction**: the per-character prompt received the
+  `parse_messages` helper function instead of the parsed current dialogue,
+  so character profiles were built from a function repr rather than the
+  conversation. Character extraction now sees the actual turn.
+- `add()` without a `user_id` now stores memories in the shared `"events"`
+  scope (matching `add_batch()`), so `search()` — which always includes
+  `"events"` — can actually retrieve them.
+- `search(limit=N)` now enforces the limit on the merged result set across
+  scopes (highest score first); previously searching a profile plus
+  `"events"` without a reranker could return up to `2N` results.
+
+### Added
+- `add(infer=False)` and `add_batch(infer=False)` are now honored: message
+  contents are stored verbatim with **zero LLM calls**, and the message
+  `role` is recorded in metadata.
+- `add(prompt=...)` is now honored as a custom extraction prompt (system
+  prompt override, raw transcript as the user message); also threaded
+  through `add_batch()`.
+- `add(memory_type="procedural_memory")` now delegates to mem0's
+  procedural-memory pipeline; any other non-None `memory_type` raises a
+  validation error instead of being silently ignored.
+- `add()` validates that at least one of `user_id`/`agent_id`/`run_id` is
+  provided, matching the documented (and mem0's) contract.
+- Offline contract test suite (`tests/test_contract.py`): deterministic
+  fake-LLM/fake-embedder tests pinning the public behavior of
+  `add`/`add_batch`/`search`, character-scope separation, raw ingestion,
+  prompt override, and result limits.
+
+### Changed
+- Inherited mem0/PostHog telemetry is now **disabled by default**
+  (`import telemem` sets `MEM0_TELEMETRY=False` unless already set);
+  documented in the READMEs and API reference.
+- `mem0ai` dependency pinned to the tested `>=2.0,<2.1` range (TeleMem
+  extends private mem0 internals, so an unbounded range was unsafe);
+  `requirements.txt` regenerated from the tested environment.
+- Test functions no longer return values (removes pytest warnings).
+
 ## [1.7.1] - 2026-06-12
 
 ### Fixed
