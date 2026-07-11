@@ -767,7 +767,7 @@ TeleMem’s development has been deeply inspired by open-source communities and 
 
 <div align="center">
 
-**If you find this project helpful, please give us a ⭐️.**
+**If you find this project helpful, please give it a ⭐️ — starring also keeps updates in your GitHub feed.**
 
 Made with ❤️ by [Bloo-Mind AI Ltd](https://www.bloo-mind.ai/) and the Ubiquitous AGI team at TeleAI.
 
