@@ -108,6 +108,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 * [遥测与隐私](#遥测与隐私)
 * [开发与贡献](#开发与贡献)
 * [致谢](#致谢)
+* [引用](#-引用)
 
 ---
 
@@ -716,7 +717,6 @@ export MEM0_TELEMETRY=true
 * 版本变更记录见 [Changelog](CHANGELOG.md)。
 * CI 会在 Python 3.10–3.12 上为每个 PR 运行离线测试套件（`uv run pytest tests/ -q`）。
 * 英文文档：[README.md](README.md)
-* 如在研究中使用 TeleMem，请引用[技术报告](https://arxiv.org/abs/2601.06037)（见 [CITATION.cff](CITATION.cff)）。
 
 ---
 ## 许可证
@@ -733,6 +733,26 @@ TeleMem 的研发与迭代离不开开源社区的宝贵成果与前沿研究的
 - [**MOOM**](https://github.com/cows21/MOOM-Roleplay-Dialogue)
 - [**DVD**](https://github.com/microsoft/DeepVideoDiscovery)
 - [**Memento**](https://github.com/Agent-on-the-Fly/Memento)
+
+---
+
+## 📑 引用
+
+如果 TeleMem 对您的研究或开发工作有帮助，请引用我们的 arXiv 论文：
+
+> Chunliang Chen, Ming Guan, Xiao Lin, Jiaxu Li, Luxi Lin, Qiyi Wang, Xiangyu Chen, Jixiang Luo, Changzhi Sun, Dell Zhang, Xuelong Li. **TeleMem: Building Long-Term and Multimodal Memory for Agentic AI.** arXiv:2601.06037, 2026. https://arxiv.org/abs/2601.06037
+
+```bibtex
+@article{chen2026telemem,
+  title   = {TeleMem: Building Long-Term and Multimodal Memory for Agentic AI},
+  author  = {Chen, Chunliang and Guan, Ming and Lin, Xiao and Li, Jiaxu and Lin, Luxi and Wang, Qiyi and Chen, Xiangyu and Luo, Jixiang and Sun, Changzhi and Zhang, Dell and Li, Xuelong},
+  journal = {arXiv preprint arXiv:2601.06037},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2601.06037}
+}
+```
+
+引用元数据另见 [CITATION.cff](CITATION.cff)（对应 GitHub 的 “Cite this repository” 按钮）。
 
 ---
 
