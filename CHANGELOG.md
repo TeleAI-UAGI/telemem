@@ -3,7 +3,7 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.8.0] - 2026-07-11
 
 ### Fixed
 - **Character memory extraction**: the per-character prompt received the

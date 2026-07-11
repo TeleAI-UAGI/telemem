@@ -65,6 +65,7 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 ---
 
 ## 📢 Latest Updates
+- **[2026-07-11] 🎉 TeleMem [v1.8.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.8.0) — the "claims = contracts" release: character-memory extraction fix, `infer=False`/`prompt`/`memory_type` now fully honored, offline contract test suite, telemetry disabled by default, and a [multi-NPC demo](examples/multi_npc.py)!**
 - **[2026-06-12] 🎉 TeleMem [v1.7.1](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.7.1) is live on the [official MCP registry](https://registry.modelcontextprotocol.io) — run the memory server with zero install: `uvx telemem`! Also new: [evaluation principles](https://teleai-uagi.github.io/telemem/evaluation/) and a LongMemEval harness with built-in baselines.**
 - **[2026-06-12] 🎉 TeleMem is now on PyPI: `pip install telemem`! [v1.6.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.6.0) adds Ollama/DeepSeek/Kimi configs, LangChain & LlamaIndex examples, and a [documentation site](https://teleai-uagi.github.io/telemem/).**
 - **[2026-06-12] 🎉 TeleMem [v1.5.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.5.0) has been released: true mem0 drop-in API, lightweight core install, and CI!**
