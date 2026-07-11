@@ -101,6 +101,7 @@ The ultimate goal of the TeleMem project is to _use an agent's hindsight to impr
 * [MCP Server](#mcp-server)
 * [Framework Integrations](#framework-integrations)
 * [Data Storage Explanation](#data-storage)
+* [Telemetry & Privacy](#telemetry--privacy)
 * [Development and Contribution](#development-and-contribution)
 * [Acknowledgements](#acknowledgements)
 
@@ -707,6 +708,19 @@ video/
         }
     }
 }
+```
+
+------
+
+## Telemetry & Privacy
+
+TeleMem itself collects no telemetry. The underlying `mem0ai` library ships
+anonymized PostHog usage telemetry, which TeleMem **disables by default**
+(`import telemem` sets `MEM0_TELEMETRY=False` unless you have already set it).
+To opt back in:
+
+```bash
+export MEM0_TELEMETRY=true
 ```
 
 ------

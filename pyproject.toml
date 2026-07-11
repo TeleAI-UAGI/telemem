@@ -29,7 +29,10 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "mem0ai",
+    # TeleMem extends mem0's Memory class and calls some private helpers
+    # (_create_memory, _search_vector_store, _create_procedural_memory), so
+    # the supported range is pinned to the tested minor series.
+    "mem0ai>=2.0,<2.1",
     "openai",
     "pydantic",
     "faiss-cpu",

@@ -1859,7 +1859,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=1.6.0" },
     { name = "mcp", marker = "extra == 'all'", specifier = ">=1.6.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.6.0" },
-    { name = "mem0ai" },
+    { name = "mem0ai", specifier = ">=2.0,<2.1" },
     { name = "nano-vectordb", marker = "extra == 'all'" },
     { name = "nano-vectordb", marker = "extra == 'video'" },
     { name = "numpy" },
