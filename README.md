@@ -382,9 +382,9 @@ def add(
 | `user_id`     | `Optional[str]`                 | ❌ No     | Character/user to attribute the memory to; TeleMem keeps an **independent memory profile per `user_id`**. Omit it to store shared conversation-event memories |
 | `agent_id` / `run_id` | `Optional[str]`         | ❌ No     | Additional mem0-compatible scopes (e.g. one `run_id` per session) |
 | `metadata`    | `Optional[Dict[str, Any]]`      | ❌ No     | Arbitrary metadata stored with each memory                  |
-| `infer`       | `bool`                          | ❌ No     | Whether to auto-generate memory summaries (default: `True`)  |
-| `memory_type` | `Optional[str]`                 | ❌ No     | Memory category (auto-classified if omitted)                 |
-| `prompt`      | `Optional[str]`                 | ❌ No     | Custom prompt for summarization (uses optimized default if omitted) |
+| `infer`       | `bool`                          | ❌ No     | Extract salient facts with the LLM (default: `True`); `False` stores message contents verbatim with no LLM call |
+| `memory_type` | `Optional[str]`                 | ❌ No     | Pass `"procedural_memory"` to create procedural memories via mem0's pipeline; omit for conversational memories |
+| `prompt`      | `Optional[str]`                 | ❌ No     | Custom extraction prompt (replaces the optimized default as the system prompt) |
 | `batch`       | `bool`                          | ❌ No     | Route through the high-throughput batched pipeline (`add_batch`) |
 
 **Returns** the mem0-compatible shape: `{"results": [{"id": "...", "memory": "...", "event": "ADD"}, ...]}`
@@ -399,6 +399,11 @@ def add(
 3. **Vectorization & similarity search**: Generate embeddings and retrieve existing similar memories.
 4. **Batch processing**: When buffer threshold is reached, invoke LLM to **semantically merge** similar memories.
 5. **Persistence**: Dual-write to **FAISS (for retrieval)** and **JSON (for metadata)**.
+
+> 🎭 **Multi-character demo**: [examples/multi_npc.py](examples/multi_npc.py) runs five tavern
+> NPCs through one scene — a single `add_batch(scene, user_id=[...])` call gives each NPC a
+> private memory profile plus a shared `"events"` world-state, and each NPC then recalls the
+> scene from their own perspective.
 
 ---
 

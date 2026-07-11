@@ -364,9 +364,9 @@ def add(
 | user\_id             | Optional[str]                 | ❌ 否    | 记忆归属的角色/用户；TeleMem 会为每个 user\_id 维护**独立记忆档案**。省略则存为共享的会话事件记忆 |
 | agent\_id / run\_id  | Optional[str]                 | ❌ 否    | 其他 mem0 兼容作用域（如每个会话一个 run\_id）                              |
 | metadata             | Optional[Dict[str, Any]]      | ❌ 否    | 随记忆存储的任意元数据                                                      |
-| infer                | bool                          | ❌ 否    | 是否自动生成记忆摘要（默认 True）                                          |
-| memory\_type         | Optional[str]                 | ❌ 否    | 记忆类型标识（默认自动分类）                                               |
-| prompt               | Optional[str]                 | ❌ 否    | 自定义摘要生成 Prompt（默认使用优化版 Prompt）                             |
+| infer                | bool                          | ❌ 否    | 是否用 LLM 提取记忆摘要（默认 True）；False 时直接原样存储消息内容，不调用 LLM |
+| memory\_type         | Optional[str]                 | ❌ 否    | 传 `"procedural_memory"` 走 mem0 的程序性记忆流水线；省略则为常规对话记忆   |
+| prompt               | Optional[str]                 | ❌ 否    | 自定义提取 Prompt（作为 system prompt 替换内置优化版 Prompt）               |
 | batch                | bool                          | ❌ 否    | 走高吞吐批处理流水线（等价于 `add_batch`）                                  |
 
 **返回值**为 mem0 兼容结构：`{"results": [{"id": "...", "memory": "...", "event": "ADD"}, ...]}`
@@ -381,6 +381,10 @@ def add(
 3. **向量化与相似检索**：生成摘要向量，检索已有相似记忆
 4. **批量处理**：达到缓冲区阈值后，调用 LLM 对相似记忆进行智能融合
 5. **持久化存储**：同时写入 FAISS 向量库（检索）和 JSON 文件（元数据）
+
+> 🎭 **多 NPC 示例**：[examples/multi_npc.py](examples/multi_npc.py) 让五个酒馆 NPC 经历同一幕剧情——
+> 一次 `add_batch(scene, user_id=[...])` 调用即可为每个 NPC 建立私有记忆档案，并写入共享的
+> `"events"` 世界状态，随后每个 NPC 都能从自己的视角回忆这段剧情。
 
 ---
 

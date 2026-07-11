@@ -33,6 +33,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   fake-LLM/fake-embedder tests pinning the public behavior of
   `add`/`add_batch`/`search`, character-scope separation, raw ingestion,
   prompt override, and result limits.
+- Multi-NPC reference example (`examples/multi_npc.py`): five NPCs live
+  through one scene; each gets a private memory profile plus the shared
+  `"events"` world-state, then recalls the scene from their own
+  perspective.
 
 ### Changed
 - Inherited mem0/PostHog telemetry is now **disabled by default**
