@@ -44,6 +44,3 @@ temp/
 # ========== Jupyter ==========
 .ipynb_checkpoints/
 site/
-
-# ========== AI Assistants ==========
-AGENTS.md
