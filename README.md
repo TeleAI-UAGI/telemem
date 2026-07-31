@@ -295,7 +295,8 @@ memory = mem0.Memory(config=config)
 ```
 
 Key points for MiniMax usage:
-- **LLM**: MiniMax M3 (512K context, default) via `https://api.minimax.io/v1`; MiniMax M2.7 / M2.7-highspeed (204K context) remain available as alternatives
+- **LLM**: MiniMax M3 (1M context, default) via `https://api.minimax.io/v1`; MiniMax M2.7 (204,800 context) is also available. MiniMax-M3 accepts text, image and video input and supports adaptive thinking; MiniMax-M2.7 is text-only with always-on thinking
+- **Regional endpoints**: use `https://api.minimax.io/v1` (global) or `https://api.minimaxi.com/v1` (China) as `openai_base_url`
 - **Temperature**: must be in **(0.0, 1.0]** — set explicitly (e.g. `0.7`) to avoid out-of-range errors
 - **Embeddings**: MiniMax does not provide a public embedding API; configure a separate embedder (e.g. `text-embedding-3-small`) in the `embedder` section
 
