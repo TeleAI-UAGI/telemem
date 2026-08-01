@@ -1,7 +1,13 @@
 # TeleMem configuration using MiniMax M3 as the LLM provider
 #
-# MiniMax provides an OpenAI-compatible API at https://api.minimax.io/v1
-# Get your API key at: https://api.minimax.io
+# MiniMax provides an OpenAI-compatible API with regional endpoints:
+#   - Global: https://api.minimax.io/v1
+#   - China:  https://api.minimaxi.com/v1
+# Get your API key at: https://platform.minimax.io (or https://platform.minimaxi.com)
+#
+# Current text models:
+#   - MiniMax-M3   (1,000,000 context; text/image/video input; adaptive thinking)
+#   - MiniMax-M2.7 (204,800 context; text input; always-on thinking)
 #
 # Note: MiniMax does not offer a public embedding API.
 # Configure a separate embedding service (e.g. OpenAI) for the embedder section.
@@ -9,8 +15,8 @@
 llm:
   provider: openai
   config:
-    model: MiniMax-M3
-    openai_base_url: https://api.minimax.io/v1
+    model: MiniMax-M3  # alternatives: MiniMax-M2.7 (204,800 context)
+    openai_base_url: https://api.minimax.io/v1  # use https://api.minimaxi.com/v1 for the China endpoint
     api_key: your-minimax-api-key  # or export MINIMAX_API_KEY and set to os.getenv("MINIMAX_API_KEY")
     temperature: 0.7  # MiniMax requires temperature in (0.0, 1.0]
 
