@@ -4,10 +4,14 @@ Exposes TeleMem's long-term memory operations as MCP tools so that any
 MCP-compatible client (Claude Desktop, Claude Code, Cursor, ...) can store
 and retrieve memories through a local TeleMem instance.
 
+Built on the official MCP Python SDK v2 (``mcp.server.mcpserver.MCPServer``),
+which implements MCP spec 2026-07-28 and transparently serves older
+(2025-era, ``initialize``-handshake) clients as well.
+
 Run it with::
 
     telemem-mcp                                      # stdio (default)
-    telemem-mcp --transport sse --port 8421          # SSE over HTTP
+    telemem-mcp --transport streamable-http          # Streamable HTTP on :8421
     TELEMEM_CONFIG=config/config.yaml telemem-mcp    # custom TeleMem config
 
 Environment variables:
@@ -32,12 +36,15 @@ from typing import Annotated, Any, Callable, Dict, List, Optional
 from pydantic import Field
 
 try:
-    from mcp.server.fastmcp import FastMCP
-except ImportError as exc:  # pragma: no cover - exercised only without the extra
+    from mcp.server.mcpserver import MCPServer
+    from mcp.types import Icon, ToolAnnotations
+except ImportError as exc:  # pragma: no cover - exercised only without the dep
     raise ImportError(
-        "The MCP SDK is required to run the TeleMem MCP server. "
-        'Install it with: pip install "telemem[mcp]"'
+        "The MCP Python SDK v2 is required to run the TeleMem MCP server. "
+        'Install it with: pip install "mcp>=2" (or pip install "telemem[mcp]")'
     ) from exc
+
+from telemem import __version__ as TELEMEM_VERSION
 
 logger = logging.getLogger("telemem.mcp")
 
@@ -51,6 +58,16 @@ SERVER_INSTRUCTIONS = (
     'memories are kept under the pseudo-user "events" and searched automatically.'
 )
 
+SERVER_WEBSITE = "https://teleai-uagi.github.io/telemem/"
+
+SERVER_ICON = Icon(
+    src="https://raw.githubusercontent.com/TeleAI-UAGI/telemem/main/assets/TeleMem.png",
+    mime_type="image/png",
+)
+
+# Local memory store: no external world interaction from any tool.
+_READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+
 _memory: Any = None
 _memory_lock = threading.Lock()
 
@@ -62,7 +79,7 @@ def _default_user_id() -> str:
 def _get_memory() -> Any:
     """Build the TeleMem ``Memory`` singleton lazily on first tool call.
 
-    Deferring the import keeps server startup instant and surfaces
+    Deferring the construction keeps server startup instant and surfaces
     configuration problems as structured tool errors instead of crashes.
     """
     global _memory
@@ -78,12 +95,18 @@ def _get_memory() -> Any:
     return _memory
 
 
-def _dumps(payload: Any) -> str:
-    return json.dumps(payload, ensure_ascii=False, default=str)
+def _jsonable(payload: Any) -> Any:
+    """Normalize a backend result to plain JSON types (UUIDs, dates -> str)."""
+    return json.loads(json.dumps(payload, ensure_ascii=False, default=str))
 
 
-def _call(action: Callable[[Any], Any]) -> str:
-    """Run ``action`` against the shared Memory and return its result as JSON.
+def _call(action: Callable[[Any], Any]) -> Dict[str, Any]:
+    """Run ``action`` against the shared Memory and return its result.
+
+    Results are returned as plain dicts so the SDK can emit them as
+    ``structuredContent`` (plus the serialized-JSON text fallback). Errors
+    come back as ``{"error": ..., "detail": ...}`` so agents can self-correct
+    instead of failing opaquely.
 
     stdout is redirected to stderr for the duration of the call: stdout
     belongs to the MCP stdio transport and some LLM/vector-store backends
@@ -94,8 +117,8 @@ def _call(action: Callable[[Any], Any]) -> str:
             result = action(_get_memory())
     except Exception as exc:
         logger.exception("TeleMem MCP tool failed")
-        return _dumps({"error": type(exc).__name__, "detail": str(exc)})
-    return _dumps(result)
+        return {"error": type(exc).__name__, "detail": str(exc)}
+    return _jsonable(result)
 
 
 def _resolve_scope(
@@ -117,7 +140,7 @@ def _fuse_search_results(raw: Any) -> str:
     if isinstance(raw, dict):
         texts = [item.get("memory", "") for item in raw.get("results", [])]
         return " ".join(text for text in texts if text and text.strip())
-    return raw if isinstance(raw, str) else _dumps(raw)
+    return raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False, default=str)
 
 
 def _scope_dict(
@@ -130,17 +153,29 @@ def _scope_dict(
     }
 
 
-def create_server(host: str = "127.0.0.1", port: int = 8421) -> FastMCP:
-    """Create the TeleMem FastMCP server (stdio, SSE, or streamable HTTP)."""
+def create_server() -> MCPServer:
+    """Create the TeleMem MCP server (run it on stdio or streamable HTTP)."""
 
-    server = FastMCP(SERVER_NAME, instructions=SERVER_INSTRUCTIONS, host=host, port=port)
+    server = MCPServer(
+        SERVER_NAME,
+        title="TeleMem",
+        instructions=SERVER_INSTRUCTIONS,
+        website_url=SERVER_WEBSITE,
+        icons=[SERVER_ICON],
+        version=TELEMEM_VERSION,
+    )
 
     @server.tool(
+        title="Add memory",
         description=(
             "Store a fact, preference, or conversation in TeleMem long-term memory. "
             "Provide `text` for a single statement or `messages` for conversation turns. "
             "Scoped by user_id/agent_id/run_id; defaults to the server's default user."
-        )
+        ),
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+        ),
+        structured_output=True,
     )
     def add_memory(
         text: Annotated[
@@ -174,12 +209,10 @@ def create_server(host: str = "127.0.0.1", port: int = 8421) -> FastMCP:
                 )
             ),
         ] = True,
-    ) -> str:
+    ) -> Dict[str, Any]:
         conversation = messages or ([{"role": "user", "content": text}] if text else None)
         if not conversation:
-            return _dumps(
-                {"error": "invalid_arguments", "detail": "Provide either `text` or `messages`."}
-            )
+            return {"error": "invalid_arguments", "detail": "Provide either `text` or `messages`."}
         scope = _resolve_scope(user_id, agent_id, run_id)
 
         def action(memory: Any) -> Dict[str, Any]:
@@ -196,11 +229,14 @@ def create_server(host: str = "127.0.0.1", port: int = 8421) -> FastMCP:
         return _call(action)
 
     @server.tool(
+        title="Search memories",
         description=(
             "Semantic search over TeleMem memories. Returns the matching memories as "
             "one consolidated text passage (TeleMem fuses related memories). Shared "
             'event memories (pseudo-user "events") are searched automatically.'
-        )
+        ),
+        annotations=_READ_ONLY,
+        structured_output=True,
     )
     def search_memories(
         query: Annotated[str, Field(description="Natural-language description of what to find.")],
@@ -214,7 +250,7 @@ def create_server(host: str = "127.0.0.1", port: int = 8421) -> FastMCP:
             Optional[float],
             Field(description="Minimum similarity score in [0, 1] for a memory to match."),
         ] = None,
-    ) -> str:
+    ) -> Dict[str, Any]:
         scope = _resolve_scope(user_id, agent_id, run_id)
         return _call(
             lambda memory: {
@@ -233,10 +269,13 @@ def create_server(host: str = "127.0.0.1", port: int = 8421) -> FastMCP:
         )
 
     @server.tool(
+        title="List memories",
         description=(
             "List stored memories for a user/agent/run with their memory_ids. "
             'Use user_id "events" to list shared conversation-event memories.'
-        )
+        ),
+        annotations=_READ_ONLY,
+        structured_output=True,
     )
     def get_memories(
         user_id: Annotated[
@@ -245,72 +284,101 @@ def create_server(host: str = "127.0.0.1", port: int = 8421) -> FastMCP:
         agent_id: Annotated[Optional[str], Field(description="Optional agent scope.")] = None,
         run_id: Annotated[Optional[str], Field(description="Optional run/session scope.")] = None,
         limit: Annotated[int, Field(description="Maximum memories to return.", ge=1)] = 20,
-    ) -> str:
+    ) -> Dict[str, Any]:
         scope = _resolve_scope(user_id, agent_id, run_id)
         return _call(lambda memory: memory.get_all(filters=_scope_dict(*scope), top_k=limit))
 
-    @server.tool(description="Fetch a single memory by its memory_id.")
+    @server.tool(
+        title="Get memory",
+        description="Fetch a single memory by its memory_id.",
+        annotations=_READ_ONLY,
+        structured_output=True,
+    )
     def get_memory(
         memory_id: Annotated[str, Field(description="Exact memory_id to fetch.")],
-    ) -> str:
+    ) -> Dict[str, Any]:
         return _call(
             lambda memory: memory.get(memory_id)
             or {"error": "not_found", "memory_id": memory_id}
         )
 
-    @server.tool(description="Overwrite the text of an existing memory by memory_id.")
+    @server.tool(
+        title="Update memory",
+        description="Overwrite the text of an existing memory by memory_id.",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+        ),
+        structured_output=True,
+    )
     def update_memory(
         memory_id: Annotated[str, Field(description="Exact memory_id to update.")],
         text: Annotated[str, Field(description="Replacement text for the memory.")],
         metadata: Annotated[
             Optional[Dict[str, Any]], Field(description="Optional replacement metadata.")
         ] = None,
-    ) -> str:
+    ) -> Dict[str, Any]:
         return _call(
             lambda memory: memory.update(memory_id, text, metadata=metadata)
             or {"status": "updated", "memory_id": memory_id}
         )
 
-    @server.tool(description="Delete a single memory by memory_id.")
+    @server.tool(
+        title="Delete memory",
+        description="Delete a single memory by memory_id.",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+        ),
+        structured_output=True,
+    )
     def delete_memory(
         memory_id: Annotated[str, Field(description="Exact memory_id to delete.")],
-    ) -> str:
+    ) -> Dict[str, Any]:
         return _call(
             lambda memory: memory.delete(memory_id)
             or {"status": "deleted", "memory_id": memory_id}
         )
 
     @server.tool(
+        title="Delete all memories in scope",
         description=(
             "Delete every memory in the given scope. Destructive: requires an explicit "
             "user_id, agent_id, or run_id — the default user is never assumed."
-        )
+        ),
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False
+        ),
+        structured_output=True,
     )
     def delete_all_memories(
         user_id: Annotated[Optional[str], Field(description="User scope to wipe.")] = None,
         agent_id: Annotated[Optional[str], Field(description="Agent scope to wipe.")] = None,
         run_id: Annotated[Optional[str], Field(description="Run scope to wipe.")] = None,
-    ) -> str:
+    ) -> Dict[str, Any]:
         if not any((user_id, agent_id, run_id)):
-            return _dumps(
-                {
-                    "error": "missing_scope",
-                    "detail": (
-                        "Refusing to wipe memories without an explicit "
-                        "user_id, agent_id, or run_id."
-                    ),
-                }
-            )
+            return {
+                "error": "missing_scope",
+                "detail": (
+                    "Refusing to wipe memories without an explicit "
+                    "user_id, agent_id, or run_id."
+                ),
+            }
         return _call(
             lambda memory: memory.delete_all(user_id=user_id, agent_id=agent_id, run_id=run_id)
             or {"status": "deleted", "scope": _scope_dict(user_id, agent_id, run_id)}
         )
 
-    @server.tool(description="Show the change history (ADD/UPDATE/DELETE events) of a memory.")
+    @server.tool(
+        title="Memory history",
+        description="Show the change history (ADD/UPDATE/DELETE events) of a memory.",
+        annotations=_READ_ONLY,
+        structured_output=True,
+    )
     def memory_history(
         memory_id: Annotated[str, Field(description="Exact memory_id to inspect.")],
-    ) -> str:
-        return _call(lambda memory: memory.history(memory_id))
+    ) -> Dict[str, Any]:
+        return _call(
+            lambda memory: {"memory_id": memory_id, "history": memory.history(memory_id)}
+        )
 
     return server
 
@@ -323,9 +391,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     )
     parser.add_argument(
         "--transport",
-        choices=["stdio", "sse", "streamable-http"],
+        choices=["stdio", "streamable-http", "sse"],
         default="stdio",
-        help="MCP transport to serve on (default: stdio)",
+        help="MCP transport to serve on (default: stdio; sse is deprecated)",
     )
     parser.add_argument("--host", default="127.0.0.1", help="Bind host for HTTP transports")
     parser.add_argument("--port", type=int, default=8421, help="Bind port for HTTP transports")
@@ -345,7 +413,16 @@ def main(argv: Optional[List[str]] = None) -> None:
         format="%(levelname)s %(name)s | %(message)s",
     )
 
-    create_server(host=args.host, port=args.port).run(transport=args.transport)
+    server = create_server()
+    if args.transport == "stdio":
+        server.run(transport="stdio")
+    else:
+        if args.transport == "sse":
+            logger.warning(
+                "The HTTP+SSE transport is deprecated by the MCP spec (2026-07-28); "
+                "use --transport streamable-http instead."
+            )
+        server.run(transport=args.transport, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

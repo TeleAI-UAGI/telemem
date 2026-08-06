@@ -11,22 +11,23 @@ local TeleMem instance.
 pip install "telemem[mcp]"
 ```
 
-This installs the [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) on
-top of TeleMem and provides the `telemem-mcp` console command.
+This installs the [MCP Python SDK v2](https://github.com/modelcontextprotocol/python-sdk) on
+top of TeleMem and provides the `telemem-mcp` console command. The server implements the
+current MCP specification (**2026-07-28**) and transparently serves older
+(`initialize`-handshake) clients as well, so any MCP client — old or new — can connect.
 
 ## Running the server
 
 ```shell
 telemem-mcp                                      # stdio (default)
-telemem-mcp --transport sse --port 8421          # SSE over HTTP
-telemem-mcp --transport streamable-http          # Streamable HTTP
+telemem-mcp --transport streamable-http          # Streamable HTTP on :8421
 TELEMEM_CONFIG=config/config.yaml telemem-mcp    # custom TeleMem config
 python -m telemem.mcp                            # equivalent module form
 ```
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--transport` | `stdio` | One of `stdio`, `sse`, `streamable-http` |
+| `--transport` | `stdio` | One of `stdio`, `streamable-http`, `sse` (deprecated by the MCP spec) |
 | `--host` | `127.0.0.1` | Bind host for the HTTP transports |
 | `--port` | `8421` | Bind port for the HTTP transports |
 | `--config` | – | TeleMem YAML/JSON config (overrides `TELEMEM_CONFIG`) |
@@ -53,6 +54,13 @@ instantly and configuration problems surface as structured tool errors instead o
 | `delete_memory` | Delete a single memory by `memory_id`. |
 | `delete_all_memories` | Wipe a scope. Destructive — requires an explicit `user_id`, `agent_id`, or `run_id`. |
 | `memory_history` | Show the ADD/UPDATE/DELETE history of a memory. |
+
+Every tool carries the standard MCP metadata clients use for display and safety
+decisions: a human-readable `title`, behavior annotations
+(`readOnlyHint`/`destructiveHint`/`idempotentHint`; `openWorldHint` is `false`
+everywhere — the memory store is local), and an output schema. Results are emitted
+as `structuredContent` (wrapped under a `"result"` key) alongside the equivalent
+JSON text content.
 
 Errors are returned as structured JSON (`{"error": ..., "detail": ...}`) so agents can
 self-correct instead of failing opaquely.
@@ -111,9 +119,13 @@ python examples/mcp_client.py
 ```python
 from telemem.mcp import create_server
 
-server = create_server(host="127.0.0.1", port=8421)
-server.run(transport="stdio")  # or "sse" / "streamable-http"
+server = create_server()
+server.run(transport="stdio")
+# or: server.run(transport="streamable-http", host="127.0.0.1", port=8421)
 ```
+
+`create_server()` returns an `MCPServer` from the official MCP Python SDK v2;
+transport settings are passed to `run()` (SDK v2 moved them out of the constructor).
 
 ## Testing
 

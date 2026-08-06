@@ -3,6 +3,34 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- **MCP server migrated to the official MCP Python SDK v2** (`mcp>=2.0.0,<3`),
+  which implements the current MCP specification (**2026-07-28**) and still
+  serves older `initialize`-handshake clients from the same server. The v1
+  SDK's `FastMCP` import path was removed upstream, so the server is now built
+  on `mcp.server.mcpserver.MCPServer` and declares server-level metadata
+  (`title`, `version`, `website_url`, icon).
+- Every MCP tool now carries the standard metadata introduced by the
+  2025-11-25/2026-07-28 specs: a human-readable `title`, behavior annotations
+  (`readOnlyHint`/`destructiveHint`/`idempotentHint`/`openWorldHint`), and a
+  derived output schema; results are emitted as `structuredContent` (wrapped
+  under a `"result"` key) alongside the unchanged JSON text content.
+- `memory_history` now returns `{"memory_id": ..., "history": [...]}` instead
+  of a bare JSON array, so its result fits the structured-output object shape.
+- `telemem.mcp.create_server()` no longer takes `host`/`port`; pass them to
+  `server.run(transport="streamable-http", host=..., port=...)` instead
+  (SDK v2 moved transport settings out of the constructor).
+- `--transport sse` is deprecated (the MCP spec deprecated HTTP+SSE); it still
+  works but logs a warning. Docs and the Docker image now show
+  `streamable-http` for HTTP deployments.
+- `examples/mcp_client.py` now uses the SDK v2 high-level `mcp.client.Client`;
+  the MCP test suite drives both the modern (2026-07-28, stateless) and the
+  legacy initialize-handshake protocol paths.
+- `server.json` registry manifest: schema bumped to `2025-12-11`, version
+  synced to the package version.
+
 ## [1.8.0] - 2026-07-11
 
 ### Fixed

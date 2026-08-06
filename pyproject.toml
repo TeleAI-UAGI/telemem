@@ -39,14 +39,16 @@ dependencies = [
     "numpy",
     "pyyaml",
     "tqdm",
-    "mcp>=1.6.0",
+    # SDK v2 implements MCP spec 2026-07-28 and still serves 2025-era clients;
+    # v1 (FastMCP import path) is maintenance-only and incompatible with our imports.
+    "mcp>=2.0.0,<3",
 ]
 
 [project.optional-dependencies]
 # Kept as an alias for backward compatibility: the MCP SDK is now a core
 # dependency so `uvx telemem` works without extras (MCP registry convention).
 mcp = [
-    "mcp>=1.6.0"
+    "mcp>=2.0.0,<3"
 ]
 video = [
     "opencv-python-headless",

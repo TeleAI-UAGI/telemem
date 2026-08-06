@@ -8,12 +8,13 @@ Memory is replaced with an in-process fake, so no API key,
 vector store, or network access is required.
 
 Covered:
-  - Tool registry: names, descriptions, required parameters
+  - Tool registry: names, titles, descriptions, annotations, required parameters
   - Argument mapping onto the TeleMem Memory API
   - Default-user scoping and destructive-operation guards
-  - Structured JSON error surfacing
+  - Structured JSON error surfacing and structuredContent emission
   - stdout protection (stdout belongs to the stdio transport)
-  - Full client/server protocol round-trip over an in-memory transport
+  - Full client/server protocol round-trips, in-process, over both the
+    modern (2026-07-28) and legacy (initialize-handshake) protocol paths
 """
 
 import asyncio
@@ -113,10 +114,18 @@ class MCPToolTestCase(unittest.TestCase):
         mcp_server._memory = self._saved_memory
 
     def call_tool(self, name, arguments=None):
-        """Invoke a tool and decode its JSON text response."""
-        content, _structured = asyncio.run(self.server.call_tool(name, arguments or {}))
-        self.assertEqual(len(content), 1)
-        return json.loads(content[0].text)
+        """Invoke a tool and decode its JSON text response.
+
+        Also checks the text content agrees with the structuredContent that
+        SDK v2 emits alongside it (open-shaped dicts are wrapped under
+        "result" by the SDK's derived output schema).
+        """
+        result = asyncio.run(self.server.call_tool(name, arguments or {}))
+        self.assertFalse(result.is_error)
+        self.assertEqual(len(result.content), 1)
+        payload = json.loads(result.content[0].text)
+        self.assertEqual(result.structured_content, {"result": payload})
+        return payload
 
     def last_call(self, name):
         matches = [kwargs for called, kwargs in self.memory.calls if called == name]
@@ -136,9 +145,23 @@ class TestToolRegistry(MCPToolTestCase):
             with self.subTest(tool=tool.name):
                 self.assertTrue(tool.description and tool.description.strip())
 
+    def test_every_tool_declares_annotations(self):
+        """Spec 2025-11-25+ metadata: titles, behavior hints, output schemas."""
+        read_only = {"search_memories", "get_memories", "get_memory", "memory_history"}
+        destructive = {"update_memory", "delete_memory", "delete_all_memories"}
+        for tool in asyncio.run(self.server.list_tools()):
+            with self.subTest(tool=tool.name):
+                self.assertTrue(tool.title and tool.title.strip())
+                self.assertIsNotNone(tool.annotations)
+                self.assertIsNotNone(tool.output_schema)
+                self.assertEqual(tool.annotations.read_only_hint, tool.name in read_only)
+                self.assertFalse(tool.annotations.open_world_hint)
+                if tool.name not in read_only:
+                    self.assertEqual(tool.annotations.destructive_hint, tool.name in destructive)
+
     def test_required_parameters(self):
         required = {
-            tool.name: tool.inputSchema.get("required", [])
+            tool.name: tool.input_schema.get("required", [])
             for tool in asyncio.run(self.server.list_tools())
         }
         self.assertEqual(required["search_memories"], ["query"])
@@ -236,7 +259,10 @@ class TestReadTools(MCPToolTestCase):
 
     def test_memory_history(self):
         result = self.call_tool("memory_history", {"memory_id": "mem-1"})
-        self.assertEqual(result, [{"memory_id": "mem-1", "event": "ADD"}])
+        self.assertEqual(
+            result,
+            {"memory_id": "mem-1", "history": [{"memory_id": "mem-1", "event": "ADD"}]},
+        )
 
 
 class TestWriteTools(MCPToolTestCase):
@@ -310,7 +336,12 @@ class TestDefaultUserOverride(MCPToolTestCase):
 
 
 class TestProtocolRoundTrip(unittest.TestCase):
-    """Drive the server through a real MCP client over an in-memory transport."""
+    """Drive the server through a real MCP client, in-process.
+
+    SDK v2 serves both protocol eras from one server: the modern
+    (2026-07-28, stateless) path and the legacy initialize-handshake
+    path. Both are exercised here.
+    """
 
     def setUp(self):
         self.memory = FakeMemory()
@@ -320,31 +351,36 @@ class TestProtocolRoundTrip(unittest.TestCase):
     def tearDown(self):
         mcp_server._memory = self._saved_memory
 
-    def test_initialize_list_and_call(self):
-        from mcp.shared.memory import create_connected_server_and_client_session
+    def _scenario(self, mode):
+        from mcp.client import Client
 
         async def scenario():
             server = create_server()
-            async with create_connected_server_and_client_session(
-                server._mcp_server
-            ) as session:
-                tools = await session.list_tools()
+            async with Client(server, mode=mode) as client:
+                tools = await client.list_tools()
                 self.assertEqual([t.name for t in tools.tools], EXPECTED_TOOLS)
 
-                added = await session.call_tool(
+                added = await client.call_tool(
                     "add_memory", {"text": "Jordan takes the subway.", "user_id": "Jordan"}
                 )
-                self.assertFalse(added.isError)
+                self.assertFalse(added.is_error)
                 self.assertEqual(json.loads(added.content[0].text)["status"], "stored")
 
-                found = await session.call_tool(
+                found = await client.call_tool(
                     "search_memories", {"query": "commute", "user_id": "Jordan"}
                 )
-                self.assertFalse(found.isError)
+                self.assertFalse(found.is_error)
                 payload = json.loads(found.content[0].text)
                 self.assertEqual(payload["memories"], "Jordan commutes by subway.")
+                self.assertEqual(found.structured_content, {"result": payload})
 
         asyncio.run(scenario())
+
+    def test_modern_list_and_call(self):
+        self._scenario("auto")
+
+    def test_legacy_initialize_list_and_call(self):
+        self._scenario("legacy")
 
 
 def main():

@@ -595,10 +595,14 @@ TeleMem ships a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) 
 pip install telemem
 
 telemem-mcp                                      # stdio (default)
-telemem-mcp --transport sse --port 8421          # SSE over HTTP
+telemem-mcp --transport streamable-http          # Streamable HTTP on :8421
 TELEMEM_CONFIG=config/config.yaml telemem-mcp    # custom TeleMem config
 uvx telemem                                      # zero-install run (stdio)
 ```
+
+Built on the official MCP Python SDK v2, the server implements the current MCP
+specification (2026-07-28) while remaining compatible with older clients; every tool
+declares titles, behavior annotations (read-only/destructive hints), and structured output.
 
 The server exposes eight tools: `add_memory`, `search_memories`, `get_memories`, `get_memory`, `update_memory`, `delete_memory`, `delete_all_memories`, and `memory_history`. Calls without an explicit scope default to `TELEMEM_DEFAULT_USER_ID` (`telemem-mcp`); destructive bulk deletion always requires an explicit scope.
 

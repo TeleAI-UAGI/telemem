@@ -576,10 +576,12 @@ TeleMem 内置 [Model Context Protocol](https://modelcontextprotocol.io)（MCP�
 pip install telemem
 
 telemem-mcp                                      # stdio（默认）
-telemem-mcp --transport sse --port 8421          # SSE over HTTP
+telemem-mcp --transport streamable-http          # Streamable HTTP（端口 8421）
 TELEMEM_CONFIG=config/config.yaml telemem-mcp    # 自定义 TeleMem 配置
 uvx telemem                                      # 零安装运行（stdio）
 ```
+
+服务器基于官方 MCP Python SDK v2 构建，实现当前 MCP 规范（2026-07-28），同时兼容旧版客户端；每个工具都声明了标题、行为注解（只读/破坏性提示）与结构化输出。
 
 服务器提供八个工具：`add_memory`、`search_memories`、`get_memories`、`get_memory`、`update_memory`、`delete_memory`、`delete_all_memories` 和 `memory_history`。未显式指定作用域的调用默认使用 `TELEMEM_DEFAULT_USER_ID`（`telemem-mcp`）；批量删除等破坏性操作必须显式指定作用域。
 

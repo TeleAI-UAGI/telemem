@@ -4,9 +4,13 @@ Spawns the TeleMem MCP server over stdio, stores a short conversation,
 then retrieves it with a semantic search — the same flow as
 examples/quickstart.py, but through MCP tool calls.
 
-Requires the MCP extra and a configured backend:
+Uses the high-level ``Client`` from the official MCP Python SDK v2, which
+negotiates the latest protocol (2026-07-28) and falls back to the legacy
+initialize handshake automatically.
 
-    pip install "telemem[mcp]"
+Requires TeleMem with a configured backend:
+
+    pip install telemem
     export OPENAI_API_KEY=sk-...                 # or:
     export TELEMEM_CONFIG=config/config.yaml     # custom LLM/embedder/vector store
 
@@ -18,7 +22,8 @@ import json
 import os
 import sys
 
-from mcp import ClientSession, StdioServerParameters
+from mcp import StdioServerParameters
+from mcp.client import Client
 from mcp.client.stdio import stdio_client
 
 MESSAGES = [
@@ -44,32 +49,31 @@ def show(label, result):
 
 
 async def main():
-    server = StdioServerParameters(
-        command=sys.executable,
-        args=["-m", "telemem.mcp"],
-        env=dict(os.environ),  # pass through TELEMEM_CONFIG / API keys
+    transport = stdio_client(
+        StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "telemem.mcp"],
+            env=dict(os.environ),  # pass through TELEMEM_CONFIG / API keys
+        )
     )
 
-    async with stdio_client(server) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
+    async with Client(transport) as client:
+        tools = await client.list_tools()
+        print("Available tools:", ", ".join(t.name for t in tools.tools))
 
-            tools = await session.list_tools()
-            print("Available tools:", ", ".join(t.name for t in tools.tools))
+        added = await client.call_tool(
+            "add_memory", {"messages": MESSAGES, "user_id": "Jordan"}
+        )
+        show("add_memory", added)
 
-            added = await session.call_tool(
-                "add_memory", {"messages": MESSAGES, "user_id": "Jordan"}
-            )
-            show("add_memory", added)
-
-            found = await session.call_tool(
-                "search_memories",
-                {
-                    "query": "What transportation did Jordan use to go to work today?",
-                    "user_id": "Jordan",
-                },
-            )
-            show("search_memories", found)
+        found = await client.call_tool(
+            "search_memories",
+            {
+                "query": "What transportation did Jordan use to go to work today?",
+                "user_id": "Jordan",
+            },
+        )
+        show("search_memories", found)
 
 
 if __name__ == "__main__":
