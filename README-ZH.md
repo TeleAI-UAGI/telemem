@@ -68,6 +68,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 
 ## 📢 最新动态
 
+- **[2026-08-06] 🎉 TeleMem [v1.9.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.9.0) 全面对齐最新 MCP 标准：迁移至官方 [MCP Python SDK v2](https://github.com/modelcontextprotocol/python-sdk)（2026-07-28 规范）——全部 8 个工具均声明标题、行为注解与结构化输出，同时保持对旧版 MCP 客户端的兼容。详见 [MCP 服务器文档](docs/MCP.md)。**
 - **[2026-07-11] 🎉 TeleMem [v1.8.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.8.0) 发布——"承诺即契约"版本：修复角色记忆提取、完整支持 `infer=False`/`prompt`/`memory_type`、新增离线契约测试套件、默认关闭遥测，并附带[多 NPC 示例](examples/multi_npc.py)！**
 - **[2026-06-12] 🎉 TeleMem [v1.7.1](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.7.1) 已登陆[官方 MCP 注册表](https://registry.modelcontextprotocol.io)——零安装运行记忆服务器：`uvx telemem`！同时新增[评测原则](https://teleai-uagi.github.io/telemem/evaluation/)与内置基线的 LongMemEval 评测工具。**
 - **[2026-06-12] 🎉 TeleMem 已上线 PyPI：`pip install telemem`！[v1.6.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.6.0) 新增 Ollama/DeepSeek/Kimi 配置、LangChain 与 LlamaIndex 示例，以及[文档站点](https://teleai-uagi.github.io/telemem/)。**
