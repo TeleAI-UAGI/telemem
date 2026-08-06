@@ -3,7 +3,7 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.9.0] - 2026-08-06
 
 ### Changed
 - **MCP server migrated to the official MCP Python SDK v2** (`mcp>=2.0.0,<3`),
