@@ -787,7 +787,12 @@ Citation metadata is also available in [CITATION.cff](CITATION.cff) (GitHub's "C
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/chart?repos=TeleAI-UAGI/telemem&type=date&legend=bottom-right&sealed_token=AYg0UQyYVfFNZGgbu0BI-U0ddDTI8q-qlFf_-hytKAktxurEsPH7OmkqnxjTex1vdD98_LlpN9rALId7n1abLpe8lio9UfbNB8UL2-xayS66nGCIs_k9o5rwmgxOpcvDpCyF7b6_Z5FITc5ONSngiJCIf6s4YI6t4Dq39n0grIlQ6R5Jw0K0DjFWA5y2)](https://www.star-history.com/?repos=TeleAI-UAGI%2Ftelemem&type=date&legend=bottom-right)
+<a href="https://github.com/TeleAI-UAGI/telemem/stargazers"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-dark.svg">
+  <img alt="Star history chart of TeleAI-UAGI/telemem" src="assets/star-history-light.svg">
+</picture></a>
+
+<sub>Regenerated weekly by [a scheduled workflow](.github/workflows/star-history.yml); the previous [star-history.com](https://www.star-history.com/) live chart broke when GitHub restricted the stargazers API to repo admins and collaborators in June 2026.</sub>
 
 ---
 
