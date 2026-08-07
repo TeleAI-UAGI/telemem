@@ -785,7 +785,7 @@ Citation metadata is also available in [CITATION.cff](CITATION.cff) (GitHub's "C
 
 ---
 
-## Star History
+<!-- ## Star History
 
 <a href="https://github.com/TeleAI-UAGI/telemem/stargazers"><picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-dark.svg">
@@ -794,7 +794,7 @@ Citation metadata is also available in [CITATION.cff](CITATION.cff) (GitHub's "C
 
 <sub>Regenerated weekly by [a scheduled workflow](.github/workflows/star-history.yml); the previous [star-history.com](https://www.star-history.com/) live chart broke when GitHub restricted the stargazers API to repo admins and collaborators in June 2026.</sub>
 
----
+--- -->
 
 <div align="center">
 
