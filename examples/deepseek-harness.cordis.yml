@@ -1,0 +1,20 @@
+# Opt-in TeleMem 1.10.0 memory for DeepSeek Harness 0.1.0-rc.5+.
+# DSH scrubs credential-shaped variables from MCP children, so every variable
+# TeleMem may need is forwarded explicitly. Empty optional values are safe:
+# TeleMem ignores an empty TELEMEM_CONFIG and uses its default configuration.
+- insert:
+    - id: memory-telemem
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: telemem
+        transport: stdio
+        command: uvx
+        args: [telemem==1.10.0]
+        cwd: !!js process.cwd()
+        toolCallTimeoutMs: 120000
+        failOnStartupError: true
+        env:
+          DEEPSEEK_API_KEY: !!js process.env.DEEPSEEK_API_KEY || ''
+          OPENAI_API_KEY: !!js process.env.OPENAI_API_KEY || ''
+          TELEMEM_CONFIG: !!js process.env.TELEMEM_CONFIG || ''
+          TELEMEM_DEFAULT_USER_ID: !!js process.env.TELEMEM_DEFAULT_USER_ID || 'deepseek-harness'

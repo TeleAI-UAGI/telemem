@@ -13,10 +13,13 @@ Integration tests are gated behind environment variables:
   - TELEMEM_TEST_OLLAMA=1 for a locally running Ollama server
 """
 
+import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -117,12 +120,56 @@ class TestTeleMemoryConfigConstruction(unittest.TestCase):
         from telemem.utils import load_config
         from telemem.configs import TeleMemoryConfig
 
-        for name, (filename, _, _) in PROVIDERS.items():
-            with self.subTest(provider=name):
-                config = load_config(str(CONFIG_DIR / filename))
-                self.assertIsInstance(config, TeleMemoryConfig)
-                self.assertEqual(config.llm.provider, "openai")
-                self.assertEqual(config.vector_store.provider, "faiss")
+        test_keys = {
+            "DEEPSEEK_API_KEY": "deepseek-test-key",
+            "OPENAI_API_KEY": "openai-test-key",
+        }
+        with patch.dict(os.environ, test_keys):
+            for name, (filename, _, _) in PROVIDERS.items():
+                with self.subTest(provider=name):
+                    config = load_config(str(CONFIG_DIR / filename))
+                    self.assertIsInstance(config, TeleMemoryConfig)
+                    self.assertEqual(config.llm.provider, "openai")
+                    self.assertEqual(config.vector_store.provider, "faiss")
+
+    def test_deepseek_keys_expand_from_environment(self):
+        from telemem.utils import load_config
+
+        test_keys = {
+            "DEEPSEEK_API_KEY": "deepseek-test-key",
+            "OPENAI_API_KEY": "openai-test-key",
+        }
+        with patch.dict(os.environ, test_keys):
+            config = load_config(str(CONFIG_DIR / "config.deepseek.yaml"))
+
+        self.assertEqual(config.llm.config["api_key"], "deepseek-test-key")
+        self.assertEqual(config.embedder.config["api_key"], "openai-test-key")
+
+    def test_missing_deepseek_key_fails_with_variable_name(self):
+        from telemem.utils import load_config
+
+        with patch.dict(
+            os.environ,
+            {"OPENAI_API_KEY": "openai-test-key"},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(ValueError, "DEEPSEEK_API_KEY"):
+                load_config(str(CONFIG_DIR / "config.deepseek.yaml"))
+
+    def test_json_environment_expansion_cannot_change_config_structure(self):
+        from telemem.utils import load_config
+
+        data = _load("ollama")
+        data["llm"]["config"]["api_key"] = "${TELEMEM_TEST_API_KEY}"
+        injected_text = "secret\nvector_store: replaced"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "config.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with patch.dict(os.environ, {"TELEMEM_TEST_API_KEY": injected_text}):
+                config = load_config(str(path))
+
+        self.assertEqual(config.llm.config["api_key"], injected_text)
+        self.assertEqual(config.vector_store.provider, "faiss")
 
 
 @unittest.skipUnless(os.getenv("DEEPSEEK_API_KEY"), "DEEPSEEK_API_KEY not set")

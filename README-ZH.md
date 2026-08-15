@@ -68,6 +68,7 @@ TeleMem的终极目标是令智能体 _积后见之明（hindsight）、致深�
 
 ## 📢 最新动态
 
+- **[2026-08-15] 🎉 TeleMem [v1.10.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.10.0) 新增对 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的原生支持：通过可选的 Cordis/MCP 补丁使用 `uvx` 启动 TeleMem，将全部 8 个记忆工具注册为 `mcp__telemem__*`，并安全传递 provider 配置。详见 [MCP 服务器文档](docs/MCP.md#deepseek-harness)。**
 - **[2026-08-06] 🎉 TeleMem [v1.9.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.9.0) 全面对齐最新 MCP 标准：迁移至官方 [MCP Python SDK v2](https://github.com/modelcontextprotocol/python-sdk)（2026-07-28 规范）——全部 8 个工具均声明标题、行为注解与结构化输出，同时保持对旧版 MCP 客户端的兼容。详见 [MCP 服务器文档](docs/MCP.md)。**
 - **[2026-07-11] 🎉 TeleMem [v1.8.0](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.8.0) 发布——"承诺即契约"版本：修复角色记忆提取、完整支持 `infer=False`/`prompt`/`memory_type`、新增离线契约测试套件、默认关闭遥测，并附带[多 NPC 示例](examples/multi_npc.py)！**
 - **[2026-06-12] 🎉 TeleMem [v1.7.1](https://github.com/TeleAI-UAGI/telemem/releases/tag/v1.7.1) 已登陆[官方 MCP 注册表](https://registry.modelcontextprotocol.io)——零安装运行记忆服务器：`uvx telemem`！同时新增[评测原则](https://teleai-uagi.github.io/telemem/evaluation/)与内置基线的 LongMemEval 评测工具。**
@@ -288,7 +289,7 @@ TeleMem 支持**任何 OpenAI 兼容接口**。`config/` 目录内置了开箱�
 | Provider | 配置文件 | LLM | 向量化 | 说明 |
 | -------- | -------- | --- | ------ | ---- |
 | **Ollama**（完全本地） | [`config.ollama.yaml`](config/config.ollama.yaml) | 任意本地模型（如 `qwen3:8b`） | `nomic-embed-text`，本地 | **无需 API key、无需云服务**——全部在本机运行 |
-| **DeepSeek** | [`config.deepseek.yaml`](config/config.deepseek.yaml) | `deepseek-chat` / `deepseek-reasoner` | 外部（如 OpenAI） | `export DEEPSEEK_API_KEY=...` |
+| **DeepSeek** | [`config.deepseek.yaml`](config/config.deepseek.yaml) | `deepseek-chat` / `deepseek-reasoner` | 外部（如 OpenAI） | `DEEPSEEK_API_KEY` + `OPENAI_API_KEY` |
 | **Moonshot（Kimi）** | [`config.moonshot.yaml`](config/config.moonshot.yaml) | `kimi-k2-0905-preview` | 外部（如 OpenAI） | 支持 `.cn` 与 `.ai` 两个端点 |
 | **MiniMax** | [`config.minimax.yaml`](config/config.minimax.yaml) | `MiniMax-M3` | 外部（如 OpenAI） | 全球 `api.minimax.io` 与中国 `api.minimaxi.com` 端点；temperature 须在 (0.0, 1.0] |
 
@@ -320,7 +321,8 @@ telemem/
 │   ├── quickstart.py         # 快速入门示例（文本记忆）
 │   ├── quickstart_mm.py      # 快速入门示例（多模态记忆）
 │   ├── mcp_client.py         # 快速入门示例（MCP stdio 客户端）
-│   └── mcp_config.json       # Claude Desktop / Cursor 的 MCP 配置示例
+│   ├── mcp_config.json       # Claude Desktop / Cursor 的 MCP 配置示例
+│   └── deepseek-harness.cordis.yml # DeepSeek Harness 记忆补丁
 ├── docs/                     # 项目文档
 │   ├── MCP.md                # MCP 服务器使用文档
 │   └── TeleMem_Tech_Report.pdf

@@ -3,6 +3,24 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.10.0] - 2026-08-15
+
+### Added
+- **DeepSeek Harness support** through an opt-in Cordis patch
+  (`examples/deepseek-harness.cordis.yml`) using the harness's official
+  `@deepseek-ai/dsh-mcp-client` interface. The patch launches the pinned TeleMem
+  release with `uvx`, exposes all eight tools under the `mcp__telemem__*`
+  namespace, forwards DSH's scrubbed credential/config environment explicitly,
+  and gives LLM-backed writes a two-minute tool timeout.
+- Offline integration-contract tests covering the Cordis patch structure,
+  release pin, environment forwarding, and DeepSeek function-name limits.
+
+### Changed
+- Config loading now securely expands `${NAME}` environment references after
+  YAML/JSON parsing and reports missing variables clearly. The DeepSeek example
+  uses `DEEPSEEK_API_KEY` for its LLM and `OPENAI_API_KEY` for embeddings, so the
+  same configuration works from DeepSeek Harness without committing secrets.
+
 ## [1.9.0] - 2026-08-06
 
 ### Changed

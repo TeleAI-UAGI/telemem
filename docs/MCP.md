@@ -1,9 +1,9 @@
 # TeleMem MCP Server
 
 TeleMem ships a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that
-exposes its long-term memory operations as MCP tools. Any MCP-compatible client — Claude
-Desktop, Claude Code, Cursor, custom agents — can store and retrieve memories through a
-local TeleMem instance.
+exposes its long-term memory operations as MCP tools. Any MCP-compatible client — DeepSeek
+Harness, Claude Desktop, Claude Code, Cursor, or a custom agent — can store and retrieve
+memories through a local TeleMem instance.
 
 ## Installation
 
@@ -76,6 +76,37 @@ self-correct instead of failing opaquely.
   `delete_all_memories` deliberately never assumes a default.
 
 ## Client configuration
+
+### DeepSeek Harness
+
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) connects to
+external tools through its `@deepseek-ai/dsh-mcp-client` plugin. TeleMem ships an opt-in
+[Cordis patch](https://github.com/TeleAI-UAGI/telemem/blob/main/examples/deepseek-harness.cordis.yml)
+that starts the pinned TeleMem release with `uvx`, discovers all eight memory tools, and
+registers them in DSH as `mcp__telemem__<tool>`.
+
+With [uv](https://docs.astral.sh/uv/getting-started/installation/) installed, use DeepSeek
+for TeleMem's extraction LLM and OpenAI for embeddings from a TeleMem checkout:
+
+```shell
+export DEEPSEEK_API_KEY="your-deepseek-api-key"  # shared by DSH and TeleMem's LLM
+export OPENAI_API_KEY="your-openai-api-key"      # embeddings (DeepSeek has no embedding API)
+export TELEMEM_CONFIG="$PWD/config/config.deepseek.yaml"
+export TELEMEM_DEFAULT_USER_ID="your-handle"
+
+npx @deepseek-ai/dsh web --patch "$PWD/examples/deepseek-harness.cordis.yml"
+```
+
+`config.deepseek.yaml` uses `${DEEPSEEK_API_KEY}` and `${OPENAI_API_KEY}` references;
+`load_config()` expands them after parsing and fails clearly if either variable is missing.
+DeepSeek Harness deliberately removes credential-shaped ambient variables before starting
+MCP children, so the patch forwards these variables explicitly without embedding their
+values in the file.
+
+For a fully local memory stack, point `TELEMEM_CONFIG` at
+`config/config.ollama.yaml` instead; no OpenAI key is then required. The DSH project is in
+developer preview, so this integration is tested against its public Cordis/MCP configuration
+contract as of `0.1.0-rc.5`.
 
 ### Claude Desktop / Cursor
 

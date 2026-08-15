@@ -1,21 +1,63 @@
-from typing import Any, Dict, List
-import numpy as np
-import re
-import yaml
 import json
+import os
+import re
 from pathlib import Path
+from typing import Any, Dict, List
+
+import numpy as np
+import yaml
+
 from telemem.configs import TeleMemoryConfig
 
-def load_config(config_path: str):
+
+_ENV_REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def _expand_environment(value: Any, config_path: Path) -> Any:
+    """Expand ``${NAME}`` references in parsed config values.
+
+    Expansion happens after parsing, so an environment value cannot inject YAML
+    keys or change the type/structure of the configuration document.
+    """
+    if isinstance(value, dict):
+        return {key: _expand_environment(item, config_path) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_expand_environment(item, config_path) for item in value]
+    if not isinstance(value, str):
+        return value
+
+    missing = set()
+
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        resolved = os.getenv(name)
+        if not resolved:
+            missing.add(name)
+            return match.group(0)
+        return resolved
+
+    expanded = _ENV_REFERENCE.sub(replace, value)
+    if missing:
+        names = ", ".join(sorted(missing))
+        raise ValueError(
+            f"Environment variable(s) referenced by {config_path} are not set: {names}"
+        )
+    return expanded
+
+
+def load_config(config_path: str) -> TeleMemoryConfig:
+    """Load a TeleMem YAML/JSON config and resolve its environment references."""
     config_path = Path(config_path)
     if config_path.suffix in {".yaml", ".yml"}:
         with open(config_path, "r", encoding="utf-8") as f:
-            return TeleMemoryConfig(**yaml.safe_load(f))
+            data = yaml.safe_load(f)
     elif config_path.suffix == ".json":
         with open(config_path, "r", encoding="utf-8") as f:
-            return TeleMemoryConfig(**json.load(f))
+            data = json.load(f)
     else:
         raise ValueError("Unsupported config file format. Use .yaml, .yml or .json")
+    return TeleMemoryConfig(**_expand_environment(data, config_path))
+
 
 def parse_messages(messages):
     response = ""

@@ -7,7 +7,7 @@ TeleMem works with **any OpenAI-compatible endpoint**: set `provider: openai` an
 | Provider | Config file | LLM | Embeddings | Notes |
 | -------- | ----------- | --- | ---------- | ----- |
 | **Ollama** (fully local) | `config.ollama.yaml` | any local model (e.g. `qwen3:8b`) | `nomic-embed-text`, local | No API key, no cloud |
-| **DeepSeek** | `config.deepseek.yaml` | `deepseek-chat` / `deepseek-reasoner` | external (e.g. OpenAI) | `export DEEPSEEK_API_KEY=...` |
+| **DeepSeek** | `config.deepseek.yaml` | `deepseek-chat` / `deepseek-reasoner` | external (e.g. OpenAI) | `DEEPSEEK_API_KEY` + `OPENAI_API_KEY` |
 | **Moonshot (Kimi)** | `config.moonshot.yaml` | `kimi-k2-0905-preview` | external (e.g. OpenAI) | `.cn` and `.ai` endpoints |
 | **MiniMax** | `config.minimax.yaml` | `MiniMax-M3` (1M context) | external (e.g. OpenAI) | global `api.minimax.io` and China `api.minimaxi.com` endpoints; temperature must be in (0.0, 1.0] |
 | **Local Qwen (vLLM etc.)** | `config.yaml` | `qwen3-8b` | `qwen3-8b-embedding` | the configuration used in the Tech Report |
@@ -26,8 +26,15 @@ memory = mem0.Memory(config=config)
 Or via the environment for the bundled examples:
 
 ```shell
+export DEEPSEEK_API_KEY=sk-...
+export OPENAI_API_KEY=sk-...  # embeddings
 TELEMEM_CONFIG=config/config.deepseek.yaml python examples/quickstart.py
 ```
+
+Config values may reference environment variables as `${NAME}`. Expansion happens after
+YAML/JSON parsing (so a value cannot inject configuration structure), and loading fails with
+the missing variable's name if a referenced value is unset. The DeepSeek example uses this
+form for both API keys.
 
 ## Fully local (Ollama)
 
