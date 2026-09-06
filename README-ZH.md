@@ -24,6 +24,9 @@
   </a>
   <img src="https://img.shields.io/github/last-commit/TeleAI-UAGI/TeleMem?color=blue" alt="Last Commit">
   <img src="https://img.shields.io/badge/PRs-Welcome-red" alt="PRs Welcome">
+  <a href="https://mcpvault.io/servers/telemem/health?utm_source=external_badge&utm_medium=referral&utm_campaign=mcp_health_report">
+    <img src="https://mcpvault.io/badge/telemem.svg" alt="MCPVault: claimed">
+  </a>
 </p>
 
 <div align="center">
@@ -572,6 +575,8 @@ print(f"Answer: ({answer})")
 ---
 
 ## MCP 服务器
+
+[![MCPVault: claimed](https://mcpvault.io/badge/telemem.svg)](https://mcpvault.io/servers/telemem/health?utm_source=external_badge&utm_medium=referral&utm_campaign=mcp_health_report)
 
 TeleMem 内置 [Model Context Protocol](https://modelcontextprotocol.io)（MCP）服务器，任何兼容 MCP 的客户端——Claude Desktop、Claude Code、Cursor、自定义 Agent——都可以把 TeleMem 用作长期记忆。
 
