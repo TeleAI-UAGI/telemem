@@ -25,7 +25,7 @@
   <img src="https://img.shields.io/github/last-commit/TeleAI-UAGI/TeleMem?color=blue" alt="Last Commit">
   <img src="https://img.shields.io/badge/PRs-Welcome-red" alt="PRs Welcome">
   <a href="https://mcpvault.io/servers/telemem/health?utm_source=external_badge&utm_medium=referral&utm_campaign=mcp_health_report">
-    <img src="https://mcpvault.io/badge/telemem.svg" alt="MCPVault: claimed">
+    <img src="https://mcpvault.io/badge/telemem.svg" alt="MCPVault: verified">
   </a>
 </p>
 
@@ -595,7 +595,7 @@ print(f"Answer: ({answer})")
 
 ## MCP Server
 
-[![MCPVault: claimed](https://mcpvault.io/badge/telemem.svg)](https://mcpvault.io/servers/telemem/health?utm_source=external_badge&utm_medium=referral&utm_campaign=mcp_health_report)
+[![MCPVault: verified](https://mcpvault.io/badge/telemem.svg)](https://mcpvault.io/servers/telemem/health?utm_source=external_badge&utm_medium=referral&utm_campaign=mcp_health_report)
 
 TeleMem ships a [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server, so any MCP-compatible client — Claude Desktop, Claude Code, Cursor, custom agents — can use TeleMem as its long-term memory.
 
