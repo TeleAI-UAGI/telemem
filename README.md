@@ -300,9 +300,11 @@ memory = mem0.Memory(config=config)
 ```
 
 Key points for MiniMax usage:
-- **LLM**: MiniMax M3 (1M context, default) via `https://api.minimax.io/v1`; MiniMax M2.7 (204,800 context) is also available. MiniMax-M3 accepts text, image and video input and supports adaptive thinking; MiniMax-M2.7 is text-only with always-on thinking
-- **Regional endpoints**: use `https://api.minimax.io/v1` (global) or `https://api.minimaxi.com/v1` (China) as `openai_base_url`
-- **Temperature**: must be in **(0.0, 1.0]** — set explicitly (e.g. `0.7`) to avoid out-of-range errors
+- **LLM**: `MiniMax-M3.1-Flash` (default) or `MiniMax-M3`, both with a 1,000,000-token context window and text/image/video input. Existing configs keep their explicit model IDs, including legacy and custom models.
+- **Regional endpoints**: use `https://api.minimax.io/v1` (global) or `https://api.minimax.cn/v1` (China) as `openai_base_url`; existing custom endpoint values are preserved.
+- **Thinking**: Flash always uses adaptive thinking, with `max` reasoning effort when omitted. The preset sets `is_reasoning_model: true` so mem0 forwards an optional `reasoning_effort` (`low`, `medium`, `high`, `xhigh`, or `max`) and omits its small default token cap. Flash rejects disabled thinking, `reasoning_effort="none"`, `service_tier`, and `reasoning_split=false`. See the [OpenAI-compatible API contract](https://platform.minimax.io/docs/api-reference/text-openai-api) for details.
+- **Tool history**: when calling the LLM adapter directly, use mem0's `response_callback` to capture the complete SDK assistant message and append it with tool results on the next call. Preserve both `reasoning_content` and `tool_calls`; the adapter's simplified return value is not a complete assistant message.
+- **Temperature**: ignored by Flash and M3, which use a fixed value of 1.
 - **Embeddings**: MiniMax does not provide a public embedding API; configure a separate embedder (e.g. `text-embedding-3-small`) in the `embedder` section
 
 ### More LLM Providers
@@ -314,7 +316,7 @@ TeleMem works with **any OpenAI-compatible endpoint**. Ready-to-use config examp
 | **Ollama** (fully local) | [`config.ollama.yaml`](config/config.ollama.yaml) | any local model (e.g. `qwen3:8b`) | `nomic-embed-text`, local | **No API key, no cloud** — everything runs on your machine |
 | **DeepSeek** | [`config.deepseek.yaml`](config/config.deepseek.yaml) | `deepseek-chat` / `deepseek-reasoner` | external (e.g. OpenAI) | `DEEPSEEK_API_KEY` + `OPENAI_API_KEY` |
 | **Moonshot (Kimi)** | [`config.moonshot.yaml`](config/config.moonshot.yaml) | `kimi-k2-0905-preview` | external (e.g. OpenAI) | `.cn` and `.ai` endpoints supported |
-| **MiniMax** | [`config.minimax.yaml`](config/config.minimax.yaml) | `MiniMax-M3` | external (e.g. OpenAI) | see section above |
+| **MiniMax** | [`config.minimax.yaml`](config/config.minimax.yaml) | `MiniMax-M3.1-Flash` / `MiniMax-M3` | external (e.g. OpenAI) | see section above |
 
 ```shell
 TELEMEM_CONFIG=config/config.ollama.yaml python examples/quickstart.py   # 100% local memory

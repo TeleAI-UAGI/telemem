@@ -25,17 +25,13 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 MINIMAX_GLOBAL_BASE_URL = "https://api.minimax.io/v1"
-MINIMAX_CN_BASE_URL = "https://api.minimaxi.com/v1"
+MINIMAX_CN_BASE_URL = "https://api.minimax.cn/v1"
 # Public OpenAI-compatible regional endpoints for the text models.
 MINIMAX_REGIONAL_URLS = [MINIMAX_GLOBAL_BASE_URL, MINIMAX_CN_BASE_URL]
+MINIMAX_MODEL_FLASH = "MiniMax-M3.1-Flash"
 MINIMAX_MODEL_M3 = "MiniMax-M3"
 MINIMAX_MODEL_M2_7 = "MiniMax-M2.7"
 MINIMAX_MODEL_M2_7_HS = "MiniMax-M2.7-highspeed"
-MINIMAX_MODEL_IDS = [MINIMAX_MODEL_M3, MINIMAX_MODEL_M2_7]
-MINIMAX_M3_CONTEXT = 1000000
-MINIMAX_M2_7_CONTEXT = 204800
-MINIMAX_TEMPERATURE_MIN = 0.0
-MINIMAX_TEMPERATURE_MAX = 1.0
 
 CONFIG_PATH = Path(__file__).parent.parent / "config" / "config.minimax.yaml"
 
@@ -83,17 +79,12 @@ class TestMiniMaxConfigFile(unittest.TestCase):
             f"Expected MiniMax model, got: {model}"
         )
 
-    def test_config_temperature_in_valid_range(self):
-        """MiniMax temperature must be in (0.0, 1.0]."""
+    def test_config_enables_reasoning_parameter_forwarding(self):
+        """The adapter must forward effort and omit its default token cap."""
         import yaml
         with open(CONFIG_PATH, "r") as f:
             data = yaml.safe_load(f)
-        temp = data["llm"]["config"].get("temperature")
-        if temp is not None:
-            self.assertGreater(temp, MINIMAX_TEMPERATURE_MIN,
-                               "MiniMax temperature must be > 0.0")
-            self.assertLessEqual(temp, MINIMAX_TEMPERATURE_MAX,
-                                 "MiniMax temperature must be <= 1.0")
+        self.assertTrue(data["llm"]["config"]["is_reasoning_model"])
 
     def test_config_embedder_provider_is_openai(self):
         """Embedder must use openai provider (MiniMax has no embedding API)."""
@@ -186,34 +177,6 @@ class TestMiniMaxTeleMemoryConfig(unittest.TestCase):
         self.assertEqual(config.llm.config["model"], MINIMAX_MODEL_M2_7_HS)
 
 
-class TestMiniMaxTemperatureConstraint(unittest.TestCase):
-    """Validate temperature values against MiniMax's (0.0, 1.0] constraint."""
-
-    def test_temperature_at_upper_bound(self):
-        """Temperature of 1.0 is valid for MiniMax."""
-        temp = 1.0
-        self.assertGreater(temp, 0.0)
-        self.assertLessEqual(temp, 1.0)
-
-    def test_temperature_at_midpoint(self):
-        """Temperature of 0.7 is valid for MiniMax."""
-        temp = 0.7
-        self.assertGreater(temp, 0.0)
-        self.assertLessEqual(temp, 1.0)
-
-    def test_temperature_zero_is_invalid(self):
-        """Temperature of 0.0 is NOT valid for MiniMax (requires > 0)."""
-        temp = 0.0
-        self.assertFalse(temp > 0.0 and temp <= 1.0,
-                         "0.0 should not be in the valid (0.0, 1.0] range")
-
-    def test_temperature_above_one_is_invalid(self):
-        """Temperature above 1.0 is NOT valid for MiniMax."""
-        temp = 1.5
-        self.assertFalse(temp > 0.0 and temp <= 1.0,
-                         "1.5 should not be in the valid (0.0, 1.0] range")
-
-
 class TestMiniMaxEndpoints(unittest.TestCase):
     """Validate the regional OpenAI-compatible endpoints exposed by MiniMax."""
 
@@ -224,7 +187,7 @@ class TestMiniMaxEndpoints(unittest.TestCase):
         self.assertIn(MINIMAX_GLOBAL_BASE_URL, self.EXPECTED_REGIONAL_URLS)
 
     def test_china_endpoint_is_documented(self):
-        """The China (api.minimaxi.com) endpoint must be in the regional list."""
+        """The China (api.minimax.cn) endpoint must be in the regional list."""
         self.assertIn(MINIMAX_CN_BASE_URL, self.EXPECTED_REGIONAL_URLS)
 
     def test_config_uses_a_documented_regional_endpoint(self):
@@ -238,70 +201,25 @@ class TestMiniMaxEndpoints(unittest.TestCase):
 
 
 class TestMiniMaxModels(unittest.TestCase):
-    """Validate MiniMax model names and current capability metadata."""
-
-    MINIMAX_MODELS = [
-        {"name": MINIMAX_MODEL_M3, "context": MINIMAX_M3_CONTEXT,
-         "input_modalities": ["text", "image", "video"],
-         "thinking": ["adaptive", "disabled"]},
-        {"name": MINIMAX_MODEL_M2_7, "context": MINIMAX_M2_7_CONTEXT,
-         "input_modalities": ["text"],
-         "thinking": ["always_on"]},
-    ]
-
-    def test_model_ids_are_the_current_set(self):
-        """The supported current model ids must be MiniMax-M3 and MiniMax-M2.7."""
-        names = [model["name"] for model in self.MINIMAX_MODELS]
-        self.assertEqual(names, MINIMAX_MODEL_IDS)
-
-    def test_model_names_start_with_minimax(self):
-        """All MiniMax model names must start with 'MiniMax-'."""
-        for model in self.MINIMAX_MODELS:
-            with self.subTest(model=model["name"]):
-                self.assertTrue(model["name"].startswith("MiniMax-"))
-
-    def test_all_models_have_long_context(self):
-        """All listed MiniMax models have at least a 204,800-token context window."""
-        for model in self.MINIMAX_MODELS:
-            with self.subTest(model=model["name"]):
-                self.assertGreaterEqual(model["context"], MINIMAX_M2_7_CONTEXT)
-
-    def test_m3_context_window_is_one_million(self):
-        """MiniMax-M3 must expose the current 1,000,000-token context window."""
-        m3 = next(m for m in self.MINIMAX_MODELS if m["name"] == MINIMAX_MODEL_M3)
-        self.assertEqual(m3["context"], MINIMAX_M3_CONTEXT)
-
-    def test_m2_7_context_window(self):
-        """MiniMax-M2.7 must expose the current 204,800-token context window."""
-        m2_7 = next(m for m in self.MINIMAX_MODELS if m["name"] == MINIMAX_MODEL_M2_7)
-        self.assertEqual(m2_7["context"], MINIMAX_M2_7_CONTEXT)
-
-    def test_m3_supports_multimodal_input(self):
-        """MiniMax-M3 accepts text, image and video input."""
-        m3 = next(m for m in self.MINIMAX_MODELS if m["name"] == MINIMAX_MODEL_M3)
-        for modality in ("text", "image", "video"):
-            with self.subTest(modality=modality):
-                self.assertIn(modality, m3["input_modalities"])
-
-    def test_m2_7_is_text_only(self):
-        """MiniMax-M2.7 only accepts text input."""
-        m2_7 = next(m for m in self.MINIMAX_MODELS if m["name"] == MINIMAX_MODEL_M2_7)
-        self.assertEqual(m2_7["input_modalities"], ["text"])
-
-    def test_m3_thinking_is_adaptive(self):
-        """MiniMax-M3 supports adaptive thinking and can disable thinking."""
-        m3 = next(m for m in self.MINIMAX_MODELS if m["name"] == MINIMAX_MODEL_M3)
-        self.assertIn("adaptive", m3["thinking"])
-        self.assertIn("disabled", m3["thinking"])
-
-    def test_m2_7_thinking_is_always_on(self):
-        """MiniMax-M2.7 always applies thinking."""
-        m2_7 = next(m for m in self.MINIMAX_MODELS if m["name"] == MINIMAX_MODEL_M2_7)
-        self.assertEqual(m2_7["thinking"], ["always_on"])
+    """Validate the shipped preset and explicit saved model selections."""
 
     def test_preferred_model_for_config(self):
-        """MiniMax-M3 is the preferred default model."""
-        self.assertEqual(MINIMAX_MODEL_M3, "MiniMax-M3")
+        """Load the actual preset rather than a separate test-only catalog."""
+        from telemem.utils import load_config
+
+        config = load_config(str(CONFIG_PATH))
+        self.assertEqual(config.llm.config["model"], MINIMAX_MODEL_FLASH)
+
+    def test_saved_model_ids_are_preserved(self):
+        from telemem.configs import TeleMemoryConfig
+
+        for model in (MINIMAX_MODEL_M3, MINIMAX_MODEL_M2_7,
+                      MINIMAX_MODEL_M2_7_HS, "custom-model"):
+            with self.subTest(model=model):
+                config = TeleMemoryConfig(llm={
+                    "provider": "openai", "config": {"model": model},
+                })
+                self.assertEqual(config.llm.config["model"], model)
 
 
 @unittest.skipUnless(os.environ.get("MINIMAX_API_KEY"), "MINIMAX_API_KEY not set")
@@ -378,7 +296,6 @@ def run_unit_tests():
     for cls in (
         TestMiniMaxConfigFile,
         TestMiniMaxTeleMemoryConfig,
-        TestMiniMaxTemperatureConstraint,
         TestMiniMaxEndpoints,
         TestMiniMaxModels,
     ):
