@@ -43,7 +43,8 @@ def memory_factory(tmp_path, monkeypatch):
 
     def make(**overrides):
         config = load_config(str(CONFIG_PATH))
-        config.llm.config.update(api_key="offline-test-key", **overrides)
+        config.llm.config.update(overrides)
+        config.llm.config["api_key"] = "offline-test-key"
         config.embedder.config["api_key"] = "offline-embedding-key"
         config.vector_store.config.path = str(tmp_path / "vectors")
         config.history_db_path = str(tmp_path / "history.db")
