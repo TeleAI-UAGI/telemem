@@ -294,7 +294,7 @@ TeleMem 支持**任何 OpenAI 兼容接口**。`config/` 目录内置了开箱�
 | **Ollama**（完全本地） | [`config.ollama.yaml`](config/config.ollama.yaml) | 任意本地模型（如 `qwen3:8b`） | `nomic-embed-text`，本地 | **无需 API key、无需云服务**——全部在本机运行 |
 | **DeepSeek** | [`config.deepseek.yaml`](config/config.deepseek.yaml) | `deepseek-chat` / `deepseek-reasoner` | 外部（如 OpenAI） | `DEEPSEEK_API_KEY` + `OPENAI_API_KEY` |
 | **Moonshot（Kimi）** | [`config.moonshot.yaml`](config/config.moonshot.yaml) | `kimi-k2-0905-preview` | 外部（如 OpenAI） | 支持 `.cn` 与 `.ai` 两个端点 |
-| **MiniMax** | [`config.minimax.yaml`](config/config.minimax.yaml) | `MiniMax-M3.1-Flash` / `MiniMax-M3` | 外部（如 OpenAI） | Global `api.minimax.io` / China `api.minimax.cn`; Flash defaults to adaptive thinking and max effort; temperature is ignored |
+| **MiniMax** | [`config.minimax.yaml`](config/config.minimax.yaml) | `MiniMax-M3.1-Flash` / `MiniMax-M3` | 外部（如 OpenAI） | 全球 `api.minimax.io` 与中国 `api.minimax.cn` 端点；Flash 固定开启自适应思考，默认推理强度为 max；temperature 不生效 |
 
 ```shell
 TELEMEM_CONFIG=config/config.ollama.yaml python examples/quickstart.py   # 100% 本地记忆
