@@ -3,6 +3,13 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- Default the MiniMax preset to `MiniMax-M3.1-Flash`, with `MiniMax-M3` as the
+  current alternative. Refresh regional endpoint and thinking guidance while
+  preserving explicit model and endpoint values in existing configurations.
+
 ## [1.10.0] - 2026-08-15
 
 ### Added
