@@ -3,12 +3,25 @@
 All notable changes to TeleMem are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.10.1] - 2026-10-23
+
+### Security
+- Bump the pinned `certifi` to `2026.10.19` in both `requirements.txt` and
+  `uv.lock` for [GHSA-6q48-6c7w-9gw2](https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2)
+  (bundled emSign root CAs with compromised intermediate CA keys). The package
+  itself does not pin `certifi`; upgrade it in existing environments with
+  `pip install -U certifi`.
 
 ### Changed
 - Default the MiniMax preset to `MiniMax-M3.1-Flash`, with `MiniMax-M3` as the
   current alternative. Refresh regional endpoint and thinking guidance while
   preserving explicit model and endpoint values in existing configurations.
+  The preset sets `is_reasoning_model: true`, so mem0 forwards an optional
+  `reasoning_effort` and no longer sends its 2000-token `max_tokens` default,
+  which could truncate thinking output.
+- The MiniMax China endpoint is now documented as `https://api.minimax.cn/v1`,
+  following MiniMax's own docs; `api.minimaxi.com` values in existing configs
+  are left unchanged.
 
 ## [1.10.0] - 2026-08-15
 

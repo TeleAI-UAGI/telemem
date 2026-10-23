@@ -1,4 +1,4 @@
-# Opt-in TeleMem 1.10.0 memory for DeepSeek Harness 0.1.0-rc.5+.
+# Opt-in TeleMem 1.10.1 memory for DeepSeek Harness 0.1.0-rc.5+.
 # DSH scrubs credential-shaped variables from MCP children, so every variable
 # TeleMem may need is forwarded explicitly. Empty optional values are safe:
 # TeleMem ignores an empty TELEMEM_CONFIG and uses its default configuration.
@@ -9,7 +9,7 @@
         serverName: telemem
         transport: stdio
         command: uvx
-        args: [telemem==1.10.0]
+        args: [telemem==1.10.1]
         cwd: !!js process.cwd()
         toolCallTimeoutMs: 120000
         failOnStartupError: true
